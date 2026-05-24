@@ -84,9 +84,12 @@ export function ChromaCaptureSection() {
         is preserved exactly. Step 3 only changes what color paints
         inside the silhouette; it does not extend the silhouette.
 
-        Values 10 / 18 / -7 are the canonical CSS-Tricks preset. Tune
-        here, not at the canvas. Capture pipeline (lib/chroma/capture.ts)
-        replicates these three steps in JS.
+        Values 10 / 30 / -11.7 — v4.3 sharpened the threshold ramp from
+        the canonical 18 / -7 to eliminate semi-transparency in thin
+        gooey necks. Same CUT POINT (blurred α ≈ 0.39), tighter ramp to
+        fully opaque (0.42 instead of 0.444). Silhouette SIZE unchanged
+        — only the alpha softness across the edge band reduces. Capture
+        pipeline (lib/chroma/capture.ts) mirrors these values.
       */}
       <svg
         aria-hidden
@@ -102,7 +105,7 @@ export function ChromaCaptureSection() {
               values="1 0 0 0 0
                       0 1 0 0 0
                       0 0 1 0 0
-                      0 0 0 18 -7"
+                      0 0 0 30 -11.7"
               result="goo"
             />
             <feComposite in="SourceGraphic" in2="goo" operator="atop" />

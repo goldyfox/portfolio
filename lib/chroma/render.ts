@@ -34,35 +34,37 @@ import { type Chord, oklchToRgba, paletteColorForHue } from "./color";
 /**
  * Radius multiplier applied at draw time. The soft alpha gradient
  * shrinks the visible silhouette under the goo filter's threshold
- * (visible boundary lands where blurred alpha ≈ 0.39). 1.32× pushes
- * the rendered edge out so the threshold cut lands at roughly the
- * same place as v3.2's hard ellipse.
+ * (visible boundary lands where blurred alpha ≈ 0.39).
  *
- * v4.2 bumped this from 1.25 → 1.32 to compensate for the softer
- * ALPHA_STOPS profile below: with more of the radius at low alpha,
- * the threshold lands at a smaller relative radius (~0.73R vs ~0.78R
- * before), so overscan has to grow to keep the visible silhouette
- * matching the physics radius. Calibrated by math; tune by eye if
- * needed.
+ * v4.3 bumped this 1.32 → 1.36 because ALPHA_STOPS dropped the flat
+ * opaque core (peak alpha is now 0.95 at center instead of 1.0).
+ * Softer center → blurred alpha crosses threshold at a slightly
+ * smaller relative radius (~0.74R vs ~0.76R). Math: visible silhouette
+ * at physics boundary requires `0.74 × overscan = 1.0` → overscan ≈ 1.36.
  */
-const RENDER_OVERSCAN = 1.32;
+const RENDER_OVERSCAN = 1.36;
 
 /**
  * Soft alpha gradient stops for each blob (radial, normalized 0–1).
- * Opaque core fading to transparent edge.
  *
- * v4.2: opaque core compressed (0.0–0.18 stays at ≥0.92 alpha vs
- * the old 0.0–0.4 at ≥0.85), partial-alpha shell expanded (0.18–1.0
- * vs the old 0.4–1.0). The wider shell is what widens visible blends
- * at overlap: as two blobs approach, their partial-alpha shells
- * overlap over a larger area, so canvas alpha-compositing blends
- * their source colors across a wider transition zone.
+ * v4.3 — no flat opaque core. Previous stops kept alpha ≥ 0.92 across
+ * the inner 18% of the radius, which read as a visible "core circle"
+ * of uniform color inside each blob's silhouette. The current stops
+ * are a smooth radial falloff with no plateau, so the center is the
+ * most-saturated point but isn't a region of uniform alpha. At blob
+ * overlap, every pair of pixels contributes via canvas alpha-
+ * compositing — producing the single-gradient-across-shape look seen
+ * in the reference imagery rather than two distinct cores meeting at
+ * a thin blend band.
+ *
+ * Saturated extremes are preserved by `feComposite atop`: where
+ * source-alpha is highest (0.95 at center), the source color paints
+ * crisply through the atop step.
  */
 const ALPHA_STOPS: ReadonlyArray<[number, number]> = [
-  [0.00, 1.00],
-  [0.18, 0.92],
-  [0.45, 0.70],
-  [0.75, 0.40],
+  [0.00, 0.95],
+  [0.35, 0.75],
+  [0.70, 0.45],
   [1.00, 0.00],
 ];
 

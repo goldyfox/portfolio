@@ -6,6 +6,23 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 23:46 — Chroma Capture v4.3 — smooth alpha falloff + sharpened threshold
+
+- Files: `lib/chroma/render.ts` (edited), `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited), `docs/DECISIONS.md` (edited).
+- What: Lisa provided four reference images (two good, two bad). The bad pair was v4.2 output. Diagnosed two specific artifacts:
+  - **Visible cores**: ALPHA_STOPS kept alpha ≥ 0.92 across the inner 18% of radius — a flat plateau that rendered as a uniform-color circle inside each blob's silhouette. Made merged silhouettes look like two stamped circles rather than one shape with a gradient.
+  - **Washed-out necks**: threshold matrix `18 -7` ramps from 0 to 1 across blurred-alpha 0.39 → 0.44 (range 0.055). Thin gooey necks fall in that range, post-threshold α ≈ 0.2 → cream shows through.
+  - **Fix 1**: ALPHA_STOPS = `[0.0, 0.95] [0.35, 0.75] [0.70, 0.45] [1.0, 0]`. No plateau; smooth radial falloff. Center is the most-saturated POINT, not a REGION.
+  - **Fix 2**: Threshold matrix = `0 0 0 30 -11.7`. Same cut point (blurred α = 0.390). Tighter ramp; opaque at 0.423 instead of 0.444. Semi-transparency band shrinks 0.055 → 0.033 → necks become opaque.
+  - **Compensation**: RENDER_OVERSCAN 1.32 → 1.36 because softer center shifts the threshold cut inward ~2% of radius.
+  - JS capture mirrors the new threshold (`GOO_ALPHA_MULT = 30, GOO_ALPHA_OFFSET_255 = 11.7 * 255`).
+- Decisions:
+  - **Keep feComposite atop.** Without atop the saturated extremes Lisa likes in the good examples would soften. Atop preserves source colors at high-alpha points; dropping the plateau alpha is the right way to soften the "cores" without sacrificing extremes.
+  - **Sharpen threshold, not the blur.** The silhouette SIZE (motion read) is determined by the cut point, not the ramp. Tighter ramp keeps silhouette identical and only narrows the soft-edge band.
+  - **Edge softness reduces ~40%**. That's the explicit tradeoff. Acceptable because the wash-out it eliminates was a bigger visual issue than the small softness loss.
+  - **Escalation path documented**: if v4.3 still doesn't reach reference quality, the next move is a parallel two-blur filter chain (σ=10 for alpha, σ=20+ for color spread). Not chosen now because it's a structural change to the filter graph.
+- Math sources: feColorMatrix alpha-channel arithmetic `a' = M*a + B`, Gaussian-kernel response analysis on radial alpha gradients without plateau.
+
 ### 23:24 — Chroma Capture v4.2 — wider blends + deep palette tier
 
 - Files: `lib/chroma/color.ts` (edited), `lib/chroma/render.ts` (edited), `docs/DECISIONS.md` (edited).

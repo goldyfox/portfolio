@@ -325,6 +325,29 @@ All motion derives from first principles:
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
 
+### Color (v4.3 — smooth-falloff alpha + sharpened threshold)
+
+v4.2 produced two visible artifacts in captured PNGs against Lisa's reference imagery:
+1. **Visible "cores"** — each blob's center read as a uniform-color circle inside the merged silhouette, so two merged blobs looked like two stamped circles with a blend band between them rather than one shape with a directional gradient.
+2. **Washed-out thin necks** — where two blob clusters were on the verge of disconnection, the goo silhouette barely connected them through a thin neck that rendered as pale cream-tinged pixels.
+
+**Diagnosis** — two distinct mechanical causes:
+
+1. The v4.2 ALPHA_STOPS started with a flat plateau (alpha ≥ 0.92 for the inner 18% of the radius). A flat-alpha region renders as a uniform-color "core circle" because the radial gradient produces no variation there. Drop the plateau and the center becomes a single most-saturated point rather than a region.
+2. The canonical CSS-Tricks threshold matrix `18 -7` ramps post-threshold alpha from 0 to 1 across a 0.055 range of blurred-alpha (0.389 → 0.444). Thin gooey necks land exactly in that semi-transparent band, so post-threshold alpha is ~0.2 and cream shows through.
+
+**Resolution** — two surgical changes that do NOT touch silhouette boundary geometry:
+
+- **ALPHA_STOPS** = `[0.0, 0.95] [0.35, 0.75] [0.70, 0.45] [1.0, 0]`. Smooth radial falloff, no plateau. Center alpha is 0.95 (was 1.0); the missing 5% lets the goo's blurred RGB contribute at the center too, softening the "stamped" effect without losing saturation (atop still preserves source colors at high-alpha regions).
+- **Threshold matrix** = `0 0 0 30 -11.7`. Same cut point (blurred α = 11.7/30 = 0.390 vs. 7/18 = 0.389 — essentially identical). Tighter ramp: post-threshold reaches fully opaque at blurred α = 0.423 (vs. 0.444). Semi-transparency band shrinks from 0.055 → 0.033. Thin necks now land in the opaque half of the ramp, not the semi-transparent half. Silhouette SIZE is unchanged — only edge softness reduces by ~40%, which is below the threshold of visible "motion read" change.
+- **RENDER_OVERSCAN** = 1.36 (was 1.32). The softer core (no plateau) shifts the threshold cut point inward by ~2% of radius; overscan bump compensates so visible silhouette stays at the physics boundary.
+
+What this preserves: silhouette boundary geometry (motion read), `feComposite atop` to keep saturated source colors at high-alpha points, the v4.2 palette (8 entries, bimodal lightness).
+
+What it does NOT do: change the BLUR σ (σ=10 untouched — the silhouette spread is identical), introduce a second blur pass, or change blob physics. If v4.3 still doesn't reach the "single gradient across silhouette" quality of the reference, the escalation path is a parallel two-blur filter chain (σ=10 for alpha, larger σ for color spread) — explicitly an architectural change, deferred until simpler tuning is exhausted.
+
+**Tradeoff acknowledged**: silhouette edges are slightly less "blurry" at the boundary. The strict "blur" character Lisa called for in the original brief is reduced ~40% at the very edge. The replacement quality — solid color through the silhouette interior including thin necks — is the right tradeoff because the original wash-out fought the reference, but if she misses the edge softness specifically, the threshold ramp width is the lever.
+
 ### Color (v4.2 — wider blends + 2-tier lightness palette)
 
 Two changes on top of v4 in response to Lisa's feedback against the first colored capture.

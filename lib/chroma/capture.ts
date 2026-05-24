@@ -39,8 +39,12 @@ const CAPTURE_DPR = 2;
  * captured PNG look different from the live render.
  */
 const GOO_BLUR_PX = 10;
-const GOO_ALPHA_MULT = 18;
-const GOO_ALPHA_OFFSET_255 = 7 * 255;
+/** v4.3: sharpened ramp from 18 / -7 → 30 / -11.7. Same cut point
+ *  (blurred α ≈ 0.39), tighter semi-transparency band (0.39–0.42 vs
+ *  0.39–0.44). Eliminates wash-out at thin gooey necks while keeping
+ *  silhouette SIZE identical to v4.2. */
+const GOO_ALPHA_MULT = 30;
+const GOO_ALPHA_OFFSET_255 = 11.7 * 255;
 
 export interface CaptureOptions {
   /** Visible canvas width in CSS pixels. */

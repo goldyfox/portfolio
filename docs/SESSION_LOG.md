@@ -6,6 +6,15 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 23:18 — Chroma Capture v4.1 — grain off
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: Lisa's first observation on the v4 capture: "the texture over the gradients is static, it doesn't move with the blobs which looks weird." She asked to try without grain entirely before tuning anything else. Flipped `includeGrain` to `false` in the live render call, removed the grain block from the capture pipeline, dropped the now-unused `makeGrainPattern` import and `GRAIN_ALPHA` constant in `capture.ts`. The grain machinery (`makeGrainPattern`, `ALPHA_STOPS`, `GRAIN_ALPHA` in `render.ts`) is intact so reactivation is a one-flag flip.
+- Decisions:
+  - **Grain off by default in v4.1.** A static tile pattern doesn't translate with moving content and reads as a screen filter rather than a material property. The lava-lamp illusion relies on the texture being PART of the blob, not floating in front of it. Better to ship without texture than to ship a texture that fights the motion.
+  - **Grain code retained, not deleted.** If we want to revisit later (per-blob displaced noise, blob-local UV sampling, etc.), the existing scaffolding is still there.
+- Math sources: none required — this is a pure pipeline toggle.
+
 ### 22:55 — Chroma Capture v4 — color palette + soft-alpha + atop composition
 
 - Files: `lib/chroma/color.ts` (edited), `lib/chroma/render.ts` (edited), `lib/chroma/capture.ts` (edited), `components/lab/chroma-capture-canvas.tsx` (edited), `components/lab/chroma-capture-section.tsx` (edited), `docs/DECISIONS.md` (edited).

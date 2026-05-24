@@ -16,19 +16,20 @@
  *      `feComposite operator="atop"`. Clips source colors strictly to
  *      the goo silhouette while preserving the soft inner gradient
  *      shape (the gradient-merge effect at overlap boundaries).
- *   5. Grain — also `source-atop`, 14% alpha — stays inside silhouette.
- *   6. Watermark on top.
+ *   5. Watermark on top.
  *
- * Grain IS included in v4 captures (vs. v3 where it was omitted): the
- * film texture is part of the artifact aesthetic the user requested.
- * The cream FRAME stays out of the PNG; everything outside the goo
- * silhouette has alpha=0, so the PNG drops cleanly onto any background.
+ * v4.1: grain is disabled in both live render and capture to match.
+ * A static tile pattern doesn't translate with the blobs and reads as
+ * a screen filter rather than a material property; better to ship
+ * grain-less than to ship a texture that fights the motion. The cream
+ * FRAME stays out of the PNG; everything outside the goo silhouette
+ * has alpha=0, so the PNG drops cleanly onto any background.
  */
 
 import { type Blob } from "./blob";
 import { hueChordSlug } from "./color-names";
 import { type Chord } from "./color";
-import { drawWatermark, makeGrainPattern, renderFrame } from "./render";
+import { drawWatermark, renderFrame } from "./render";
 
 const CAPTURE_DPR = 2;
 
@@ -40,8 +41,6 @@ const CAPTURE_DPR = 2;
 const GOO_BLUR_PX = 10;
 const GOO_ALPHA_MULT = 18;
 const GOO_ALPHA_OFFSET_255 = 7 * 255;
-/** Match `GRAIN_ALPHA` in render.ts. */
-const GRAIN_ALPHA = 0.14;
 
 export interface CaptureOptions {
   /** Visible canvas width in CSS pixels. */
@@ -125,16 +124,9 @@ export async function captureToPng(opts: CaptureOptions): Promise<boolean> {
   co.globalCompositeOperation = "source-atop";
   co.drawImage(stage1, 0, 0);
 
-  // 4c. Grain inside the silhouette only. Same source-atop rule keeps
-  //     the cream-frame area clean. Alpha is unaffected by source-atop
-  //     so silhouette boundary is preserved.
-  const grainPattern = makeGrainPattern(co);
-  if (grainPattern) {
-    co.globalAlpha = GRAIN_ALPHA;
-    co.fillStyle = grainPattern;
-    co.fillRect(0, 0, out.width, out.height);
-    co.globalAlpha = 1;
-  }
+  // 4c. Grain disabled in v4.1 — matches the live render. A static
+  //     grain tile reads as a screen filter rather than a property of
+  //     the moving material. Toggle back on if we decide we want it.
 
   // Reset composite op for the watermark (drawn over everything).
   co.globalCompositeOperation = "source-over";

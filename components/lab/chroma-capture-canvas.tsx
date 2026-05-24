@@ -397,7 +397,11 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
           height,
           nowMs,
           chord: chordRef.current,
-          includeGrain: true,
+          // v4.1: grain disabled. The grain pattern is fixed in canvas
+          // space, so it doesn't translate with the moving blobs — the
+          // texture reads as a screen filter rather than a property of
+          // the material. Toggle back to `true` if we want it.
+          includeGrain: false,
           includeWatermark: false,
           flashAlpha,
           grainPattern: grainPatternRef.current,

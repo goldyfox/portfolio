@@ -325,6 +325,33 @@ All motion derives from first principles:
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
 
+### Color (v4.2 — wider blends + 2-tier lightness palette)
+
+Two changes on top of v4 in response to Lisa's feedback against the first colored capture.
+
+**Wider blend zone**. v4 stops `[0.0,1.0] [0.4,0.85] [0.7,0.55] [0.9,0.25] [1.0,0]` kept 40% of each blob fully opaque, so the partial-alpha shell that produces visible color blending at overlap was only the outer 60% of the radius. The visible result was hard-edged blob colors meeting at a thin transition band — not the smooth gradient blends in the reference.
+
+v4.2 stops: `[0.0,1.0] [0.18,0.92] [0.45,0.70] [0.75,0.40] [1.0,0]`. Opaque core compressed to 18% of radius; partial-alpha shell expanded to 82% of radius. As two blobs approach, their soft shells overlap over a much larger area, and canvas alpha-compositing blends their source colors across a wider transition zone. Net visual: gradient between two blob colors fills most of the merged region instead of just the seam.
+
+**Overscan bumped 1.25 → 1.32**. Softer middle = blurred alpha crosses the threshold (0.39) at a smaller relative radius (~0.73R vs ~0.78R), which would shrink the visible silhouette ~6%. Math: to restore the v3.2 visible boundary at the same physics radius, overscan must satisfy `0.73 × X = 0.78 × 1.25` → X ≈ 1.34. Going with 1.32 first (conservative); can tune to 1.36 if blobs read smaller than before. The motion-read constraint is unchanged: the GOO FILTER (blur σ=10, threshold 18 -7) is still untouched — only the source side of the pipeline changes.
+
+**Deep tier added to palette**. The original v4 palette was uniform at L=0.66, C=0.22. Lisa asked for a dark purple and a warmer navy. Added two entries at L=0.40 C=0.18:
+
+- `h=310` deep purple — between indigo (285) and magenta (315) in the wheel; reads as plum/aubergine at this L.
+- `h=255` warm navy — at the warm edge of cool (h=240 = pure blue, 255 leans toward indigo); reads as deep cobalt.
+
+Why bimodal lightness (0.66 and 0.40) instead of a continuous range:
+- Continuous L randomization across [0.40, 0.66] would yield too many mid-L (~0.55) blobs that read as muddy washed-out mid-tones.
+- Two discrete tiers preserve both characters: light tier stays vibrant gallery-pastel; dark tier reads as deep gemstone. Mid-luminance results only appear at overlap blends (mathematically L≈0.53), which is the desired "gemstone overlap" effect.
+
+Why C=0.18 for the deep tier: high-chroma colors at low lightness clip in sRGB. C=0.18 keeps both deep entries in-gamut. (Inspected via `oklchToHex`; no clipping observed.)
+
+Why not weight sampling toward darks or lights: uniform sampling across 8 entries gives ~25% dark blobs (4–5 of ~18 visible). That ratio reads as "some darks anchoring a mostly-light field" — matches the brief's "add in some darker colors" phrasing. If the proportion feels wrong in practice, sampling weight is a one-line change.
+
+**Data model change**: palette is now `CHROMA_PALETTE: ReadonlyArray<PaletteEntry>` where each entry carries its own L/C/h/name. Render code calls `paletteColorForHue(blob.hues[0])` to look up the full OKLCH color at draw time. The hue-only export (`CHROMA_PALETTE_HUES`) and scalar L/C defaults are retained for `STATIC_PALETTE_CHORD` (filename slug metadata, no visual impact). The blob structure still stores `hues: number[]` — only one extra lookup per draw call, negligible cost.
+
+What this does NOT change: the SVG filter chain (still blur+threshold+atop), the per-blob render structure (still elliptical scale + radial gradient + arc), `physics.ts`, `blob.ts`, cursor model (v3.3), spawn (v3.2). Strictly the palette source-of-truth, the gradient profile, and the overscan constant.
+
 ### Color (v4 — static warm-vibrant palette + soft alpha + feComposite atop)
 
 v1–v3.3 ran mono ethos-blue while shape and motion were tuned. v4 reintroduces color. Lisa's brief: "Pick a color palette that each blob generates as a specific color. Use the color wheel to make sure all colors look good together. ... When two or more blobs start merging, produce a gradient patterned effect ... that preserves blur, texture, and gracefully blends from one color into the next." Reference image: kuro.store-style warm analogous (purple/red/orange/yellow) with grain texture.

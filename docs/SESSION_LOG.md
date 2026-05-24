@@ -6,6 +6,22 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 23:24 — Chroma Capture v4.2 — wider blends + deep palette tier
+
+- Files: `lib/chroma/color.ts` (edited), `lib/chroma/render.ts` (edited), `docs/DECISIONS.md` (edited).
+- What: Lisa's two outstanding asks against the first colored capture — blends not smooth enough; wants dark purple + warm navy added. Bundled both as one pass (orthogonal changes).
+  - **Wider blends**: `ALPHA_STOPS` changed from `[0.0,1.0] [0.4,0.85] [0.7,0.55] [0.9,0.25] [1.0,0]` to `[0.0,1.0] [0.18,0.92] [0.45,0.70] [0.75,0.40] [1.0,0]`. Opaque core compressed from 40% → 18% of radius; partial-alpha shell grew from 60% → 82% of radius. The wider shell is where overlap color-blending happens via canvas alpha compositing — bigger overlap zone = more gradient, less hard seam.
+  - **Overscan**: bumped 1.25 → 1.32 to compensate for the threshold cutting at a smaller relative radius with the softer profile. Math derived in DECISIONS; calibrate by eye if blobs read smaller than v4.
+  - **Palette data model**: `CHROMA_PALETTE` is now `ReadonlyArray<PaletteEntry>` with per-entry L/C/h/name. Lookup via `paletteColorForHue(hue)` at render time. `render.ts` switched from a hardcoded `{L: CHROMA_PALETTE_L, C: CHROMA_PALETTE_C, h: hue}` build to the lookup so the deep tier renders at its darker L/C.
+  - **Deep tier**: two new entries at L=0.40 C=0.18 — `h=310 deep purple` (between indigo and magenta), `h=255 warm navy` (warm edge of cool). Bimodal lightness on purpose; continuous L randomization would produce muddy mid-tones.
+  - **Sampling**: still uniform across all 8 entries. ~25% dark blobs at any time matches "some darks." Weighting is a one-line change if it feels off.
+- Decisions:
+  - **Bundle 2+3 in one pass.** Orthogonal — gradient stops affect HOW blobs blend, palette affects WHAT colors blend. No diagnostic confusion.
+  - **Bimodal lightness, not continuous.** Discrete L=0.66 and L=0.40 preserve both light vibrancy and deep gemstone character; mids only appear at overlap blends (~0.53) where they belong.
+  - **C=0.18 for the deep tier.** High chroma at low lightness clips sRGB; inspected `oklchToHex` to confirm in-gamut.
+  - **Goo filter still untouched.** Blur σ=10, threshold 18 -7. Motion read remains the protected invariant.
+- Math sources: alpha-compositing math (Porter-Duff source-over), Gaussian-kernel response on softened alpha gradients, OKLab/OKLCH gamut bounds at low L.
+
 ### 23:18 — Chroma Capture v4.1 — grain off
 
 - Files: `components/lab/chroma-capture-canvas.tsx` (edited), `lib/chroma/capture.ts` (edited).

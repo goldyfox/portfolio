@@ -29,47 +29,47 @@
  */
 
 import { type Blob, popDisplay } from "./blob";
-import {
-  CHROMA_PALETTE_C,
-  CHROMA_PALETTE_L,
-  type Chord,
-  oklchToRgba,
-} from "./color";
+import { type Chord, oklchToRgba, paletteColorForHue } from "./color";
 
 /**
  * Radius multiplier applied at draw time. The soft alpha gradient
  * shrinks the visible silhouette under the goo filter's threshold
- * (visible boundary lands where blurred-alpha = ~0.39). 1.25× pushes
- * the rendered edge out so the threshold cut lands at the same place
- * as v3.2's hard ellipse. Calibrated by inspection; preserves motion
- * read exactly.
+ * (visible boundary lands where blurred alpha ≈ 0.39). 1.32× pushes
+ * the rendered edge out so the threshold cut lands at roughly the
+ * same place as v3.2's hard ellipse.
+ *
+ * v4.2 bumped this from 1.25 → 1.32 to compensate for the softer
+ * ALPHA_STOPS profile below: with more of the radius at low alpha,
+ * the threshold lands at a smaller relative radius (~0.73R vs ~0.78R
+ * before), so overscan has to grow to keep the visible silhouette
+ * matching the physics radius. Calibrated by math; tune by eye if
+ * needed.
  */
-const RENDER_OVERSCAN = 1.25;
+const RENDER_OVERSCAN = 1.32;
 
 /**
  * Soft alpha gradient stops for each blob (radial, normalized 0–1).
- * Opaque core fading to transparent edge. The threshold in the SVG
- * filter cuts roughly at 0.39 blurred alpha → with these stops the
- * visible silhouette ends near r=0.8 of the rendered radius.
+ * Opaque core fading to transparent edge.
  *
- * Why these specific stops: dense opaque core (0–40%) is what reads as
- * "stronger opacity in the middle"; the 40–90% taper is what produces
- * the soft inner gradient when blobs overlap (canvas alpha compositing
- * mixes the two source colors smoothly across the partial-alpha edges).
+ * v4.2: opaque core compressed (0.0–0.18 stays at ≥0.92 alpha vs
+ * the old 0.0–0.4 at ≥0.85), partial-alpha shell expanded (0.18–1.0
+ * vs the old 0.4–1.0). The wider shell is what widens visible blends
+ * at overlap: as two blobs approach, their partial-alpha shells
+ * overlap over a larger area, so canvas alpha-compositing blends
+ * their source colors across a wider transition zone.
  */
 const ALPHA_STOPS: ReadonlyArray<[number, number]> = [
   [0.00, 1.00],
-  [0.40, 0.85],
-  [0.70, 0.55],
-  [0.90, 0.25],
+  [0.18, 0.92],
+  [0.45, 0.70],
+  [0.75, 0.40],
   [1.00, 0.00],
 ];
 
 /**
- * Grain opacity inside blob pixels. Applied with `source-atop` so the
- * cream frame outside the goo silhouette stays clean. 14% is loud
- * enough to read as analog film texture without overwhelming the
- * palette colors.
+ * Grain opacity when reactivated (currently dormant — see v4.1 in the
+ * session log). Kept as a constant so toggling `includeGrain: true` in
+ * the canvas component restores the previous behavior in one place.
  */
 const GRAIN_ALPHA = 0.14;
 
@@ -150,7 +150,9 @@ function drawBlob(ctx: CanvasRenderingContext2D, blob: Blob, nowMs: number): voi
   const renderR = radius * RENDER_OVERSCAN;
   const stretch = Math.max(0.1, blob.stretch);
   const hue = blob.hues[0] ?? 0;
-  const color = { L: CHROMA_PALETTE_L, C: CHROMA_PALETTE_C, h: hue };
+  // v4.2: per-hue L/C lookup so deep-tier hues (purple 310, navy 255)
+  // render at their darker L/C without an external lightness switch.
+  const color = paletteColorForHue(hue);
 
   ctx.save();
   ctx.translate(blob.pos.x, blob.pos.y);

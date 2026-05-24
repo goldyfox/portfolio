@@ -179,39 +179,87 @@ export function rotateHue(currentHue: number, degreesPerSecond: number, dt: numb
 }
 
 // ---------------------------------------------------------------------------
-// Chroma Capture palette (v4)
+// Chroma Capture palette (v4.2 — 8-hue, bimodal lightness)
 //
-// Curated 6-hue analogous-warm palette spanning 130° on the OKLCH wheel.
-// Every pair of hues sits within ~70° of each other, so every overlap
-// blend produces a vibrant intermediate hue rather than collapsing to
-// gray (which is what happens with triadic / complementary chords in
-// OKLab). Order is anatomical, not aesthetic — sampled uniformly by
-// `randomPaletteHue`.
+// Six light warm hues at OKLCH L=0.66 C=0.22 form the core chord (the
+// original v4 analogous-warm anchors: indigo, magenta, crimson, coral,
+// tangerine, goldenrod). Two deep hues at L=0.40 C=0.18 add contrast —
+// deep purple (h=310) and warm navy (h=255). When a deep blob overlaps
+// a light blob, alpha-blend produces a mid-luminance gradient (L≈0.53),
+// which reads as the "deep gemstone" overlap effect.
 //
-// Curated, not algorithmic: these are six anchor points chosen by hand
-// against the kuro.store reference image and standard analogous-warm
-// theory. Skip 180–270 entirely (cool side) — those hues paired with
-// the warm anchors would produce muddy mid-tones in any blend.
+// Why two lightness tiers, not one continuous range:
+//   • L=0.66 alone is what makes the warms read as "vibrant gallery
+//     pastels"; if every blob were dark the palette would feel oppressive.
+//   • L=0.40 alone would lose the vibrancy. Mixing the two creates
+//     selective depth without sacrificing the core character.
+//   • Continuous interpolation (L randomized per blob) was rejected —
+//     it would produce too many washed mid-tones (L≈0.55) that read
+//     as muddy, not deep.
+//
+// Why C=0.18 for the deep tier: high chroma at low lightness clips in
+// sRGB. Verified by inspection of `oklchToHex` — both deep entries
+// stay in-gamut at C=0.18.
+//
+// Cool side (180–250°) still excluded apart from the warm navy
+// (h=255 is right at the warm edge of cool). Pure teal/cyan would
+// produce muddy mid-tones in any blend with the warm anchors.
 // ---------------------------------------------------------------------------
 
-export const CHROMA_PALETTE_HUES = [
-  285, // indigo / deep violet
-  315, // magenta
-  350, // crimson
-  15,  // coral
-  35,  // tangerine
-  55,  // goldenrod
-] as const;
+export interface PaletteEntry {
+  L: number;
+  C: number;
+  /** Hue in degrees, 0–360. */
+  h: number;
+  /** Human-readable name for docs and inspection. Filename slugs use
+   *  `hueChordSlug` (hue-based) for stability across palette edits. */
+  name: string;
+}
 
-/** Common OKLCH lightness for every palette hue. */
+export const CHROMA_PALETTE: ReadonlyArray<PaletteEntry> = [
+  { L: 0.66, C: 0.22, h: 285, name: "indigo" },
+  { L: 0.66, C: 0.22, h: 315, name: "magenta" },
+  { L: 0.66, C: 0.22, h: 350, name: "crimson" },
+  { L: 0.66, C: 0.22, h: 15,  name: "coral" },
+  { L: 0.66, C: 0.22, h: 35,  name: "tangerine" },
+  { L: 0.66, C: 0.22, h: 55,  name: "goldenrod" },
+  { L: 0.40, C: 0.18, h: 310, name: "deep purple" },
+  { L: 0.40, C: 0.18, h: 255, name: "warm navy" },
+];
+
+/**
+ * Default L/C for the light tier — used by `STATIC_PALETTE_CHORD` (which
+ * only feeds the filename slug; visual rendering uses
+ * `paletteColorForHue`). Dark entries override per-row.
+ */
 export const CHROMA_PALETTE_L = 0.66;
-/** Common OKLCH chroma for every palette hue. In-sRGB-gamut across the
- *  warm-side palette; would clip on cool / cyan hues at this saturation. */
 export const CHROMA_PALETTE_C = 0.22;
 
-/** Return one hue from the palette, uniformly sampled. */
+/** Hue-indexed lookup of L/C built once at module init. */
+const HUE_TO_LC = new Map<number, { L: number; C: number }>(
+  CHROMA_PALETTE.map((e) => [e.h, { L: e.L, C: e.C }]),
+);
+
+/**
+ * Resolve a palette hue back to its full OKLCH color. Falls back to
+ * the light-tier defaults if the hue isn't a known palette entry
+ * (defensive; shouldn't happen since all blob hues come from
+ * `randomPaletteHue`).
+ */
+export function paletteColorForHue(hue: number): OklchColor {
+  const lc = HUE_TO_LC.get(hue) ?? { L: CHROMA_PALETTE_L, C: CHROMA_PALETTE_C };
+  return { L: lc.L, C: lc.C, h: hue };
+}
+
+/**
+ * Hue-only array, preserved for callers that just need the wheel
+ * positions (e.g. `STATIC_PALETTE_CHORD`). Order matches `CHROMA_PALETTE`.
+ */
+export const CHROMA_PALETTE_HUES = [285, 315, 350, 15, 35, 55, 310, 255] as const;
+
+/** Sample one palette hue uniformly across all 8 entries. */
 export function randomPaletteHue(): number {
-  return CHROMA_PALETTE_HUES[Math.floor(Math.random() * CHROMA_PALETTE_HUES.length)];
+  return CHROMA_PALETTE[Math.floor(Math.random() * CHROMA_PALETTE.length)].h;
 }
 
 /**

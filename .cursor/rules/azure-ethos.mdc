@@ -1,0 +1,44 @@
+---
+description: "Azure Ethos design system constraints — enforced on all files"
+alwaysApply: true
+---
+
+# Azure Ethos guardrails
+
+Source of truth: `docs/DESIGN.md`
+
+## Colors
+
+- Brand colors: `#1313ec` (ethos-blue) and `#fdfbf7` (ethos-cream). No others.
+- Use Tailwind tokens (`text-ethos-blue`, `bg-ethos-cream`), not raw hex in components.
+
+## Typography
+
+- Serif: Newsreader — display, headlines, titles, body.
+- Sans: Inter — labels, utility text, navigation.
+- No other fonts.
+
+## Spacing
+
+- `macro` (160px) between major sections.
+- Use `SITE_CONTENT_SHELL` from `lib/site-layout.ts` for horizontal framing.
+
+## Elevation
+
+- No box-shadows on cards or sections.
+- No rounded corners exceeding 10px (except brand-defined circles).
+- No 1px borders for general layout. Use hairline blue or tonal shifts only.
+- Shadows (if required): atmospheric only — `0 20px 40px rgba(19,19,236,0.05)`.
+
+## Interaction
+
+- Hover: `#1313ec` site-wide. Do not add opacity-based hover on primary links.
+- Image hover: grayscale-to-color + `1.03x` scale.
+
+## Lab Vault exception
+
+- `/lab` uses a **full-dark Vault** aesthetic (including header and footer chrome) via `app/lab/layout.tsx`.
+- Dark ground replaces `bg-ethos-cream`; text flips to cream/white; `ethos-blue` remains the accent.
+- Azure Halo is hidden or dimmed on Lab.
+- All other pages (Index, Ethos, Selected Work, Doodles, Contact) remain cream-forward.
+- See `docs/DECISIONS.md` "Lab page (full-dark Vault)" for the canonical rule.

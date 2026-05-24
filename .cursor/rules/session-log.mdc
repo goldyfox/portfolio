@@ -1,0 +1,39 @@
+---
+description: Session log — persistent memory across chats
+globs:
+alwaysApply: true
+---
+
+# Session log
+
+## On session start
+
+Read `docs/SESSION_LOG.md` before responding to the first message. It contains:
+
+- Daily session summaries with decisions made
+- Visual reference inventory (saved screenshots with descriptions)
+- Hard design rules (e.g., NO SIDEBARS)
+- Open items and context for future work
+
+Do not re-propose approaches that conflict with logged decisions.
+
+## After code changes
+
+Append entries to `docs/SESSION_LOG.md` under the current day's heading. Format:
+
+```
+### HH:MM — <short description>
+- Files: `path/to/file.tsx` (created | edited | deleted)
+- What: <1-2 sentence summary of what changed and why>
+- Decisions: <any new design or architecture decisions made, or "None">
+```
+
+If today's date heading does not exist yet, create it using the format `## YYYY-MM-DD — Session N: <topic>`. Increment N from the last session number in the log.
+
+**When to log:**
+- New files, deleted files, or architectural/structural changes — log immediately.
+- Design decisions, accessibility fixes, or anything a future session needs to know — log immediately.
+- Minor copy tweaks, typo fixes, and small iterative edits in the same working session — **batch into a single entry** when the batch of work is done. Don't log every one-word change individually.
+
+**When NOT to log:**
+- Trivial whitespace, punctuation, or casing fixes that don't affect decisions or architecture.

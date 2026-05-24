@@ -1,0 +1,15 @@
+---
+description: Component extraction — create shared components for any UI element that will appear on multiple pages
+alwaysApply: true
+---
+
+# Component extraction
+
+When building any UI element that will appear on more than one page (buttons, cards, badges, labels, nav items, etc.), create a shared component from the start. Do not inline the same markup across multiple files and refactor later.
+
+- **Buttons**: Any styled button or link-as-button gets a component immediately.
+- **Patterns**: If you write a `className` string longer than ~80 chars that will be reused, extract it.
+- **Location**: Shared portfolio components live in `components/portfolio/`.
+- **Naming**: Use descriptive names (`BackToIndex`, not `Button1`).
+
+This avoids multi-file updates when styles change and keeps the design system consistent.

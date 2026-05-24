@@ -1,0 +1,363 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-ethos-blue: #1313ec;
+  --color-ethos-cream: #fdfbf7;
+  --spacing-macro: 160px;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, "Times New Roman", serif;
+}
+
+body {
+  background-color: var(--color-ethos-cream);
+  color: var(--color-gray-900);
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* Hairline Blue — purposeful 1px anchor, per Azure Ethos */
+.blue-hairline {
+  border-top: 1px solid #1313ec;
+}
+
+/* Azure Halo — large circular stroke, primary blue @ 10% */
+.azure-halo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Grid Hydration — interactive cursor-following grid */
+.grid-hydration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  background-size: 36px 36px;
+  background-image:
+    linear-gradient(to right, rgb(19 19 236 / 1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(19 19 236 / 1) 1px, transparent 1px);
+  -webkit-mask-image: radial-gradient(circle 300px at var(--mouse-x, -1000px) var(--mouse-y, -1000px), rgba(0,0,0,0.20), rgba(0,0,0,0.03));
+  mask-image: radial-gradient(circle 300px at var(--mouse-x, -1000px) var(--mouse-y, -1000px), rgba(0,0,0,0.20), rgba(0,0,0,0.03));
+}
+
+.azure-halo::before {
+  content: "";
+  position: absolute;
+  width: min(140vw, 72rem);
+  height: min(140vw, 72rem);
+  top: -12%;
+  right: -18%;
+  border-radius: 50%;
+  border: 1px solid rgb(19 19 236 / 0.1);
+  box-sizing: border-box;
+}
+
+/* Page title — shared headline style across all top-level pages */
+.page-title {
+  font-family: var(--font-serif);
+  font-size: clamp(3.5rem, 8vw, 7.5rem);
+  line-height: 1.1;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--color-gray-900);
+}
+
+@media (min-width: 975px) {
+  .page-title {
+    font-weight: 300;
+  }
+}
+
+/* Subpage title — catalog project pages */
+.subpage-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  line-height: 1.1;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--color-gray-900);
+}
+
+/* Catalog table grid — responsive archive layout */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: 80px 2.5fr 1fr 1.5fr 40px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .catalog-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .catalog-header {
+    display: none;
+  }
+
+  .catalog-grid > div {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .col-year {
+    font-size: 0.75rem;
+  }
+
+  .col-project {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .col-domain,
+  .col-impact,
+  .col-arrow {
+    display: none;
+  }
+}
+
+/* No default boxed chrome on cards / sections (tonal layering only) */
+section,
+.card {
+  box-shadow: none;
+}
+
+section {
+  border-width: 0;
+  border-style: solid;
+}
+
+.card {
+  border: none;
+}
+
+/* Links: hover/focus — Primary Blue (#1313ec = ethos-blue). !important beats Tailwind text-* on the same element. */
+:any-link {
+  cursor: pointer;
+  transition-property: color;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:any-link:hover,
+:any-link:focus-visible {
+  color: #1313ec !important;
+}
+
+.btn-back:hover,
+.btn-back:focus-visible {
+  color: #ffffff !important;
+}
+
+/* Flip-clock animation for header title swap */
+@keyframes flipOut {
+  from { transform: rotateX(0deg); opacity: 1; }
+  to { transform: rotateX(-90deg); opacity: 0; }
+}
+
+@keyframes flipIn {
+  from { transform: rotateX(90deg); opacity: 0; }
+  to { transform: rotateX(0deg); opacity: 1; }
+}
+
+.flip-out {
+  animation: flipOut 200ms ease-in forwards;
+}
+
+.flip-in {
+  animation: flipIn 200ms ease-out forwards;
+}
+
+/* Site title — "Product Design" tagline: keep gray; hover = opacity (legacy footer style), not ethos blue */
+.site-title-link .site-title-tagline {
+  transition-property: opacity, color;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.site-title-link:hover .site-title-tagline,
+.site-title-link:focus-within .site-title-tagline {
+  color: var(--color-gray-900) !important;
+}
+
+.site-title-link .site-title-tagline:hover,
+.site-title-link .site-title-tagline:focus-visible {
+  opacity: 0.7;
+  color: var(--color-gray-900) !important;
+}
+
+/* ===================================================================
+   Case study animations — GenAI layout variants
+   =================================================================== */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.shimmer-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 3s infinite;
+}
+
+.case-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 1.2s cubic-bezier(0.85, 0, 0.15, 1);
+}
+
+.case-reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .case-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .shimmer-line::after {
+    animation: none !important;
+  }
+}
+
+/* ===================================================================
+   Vault Theme — Lab page full-dark experience
+   Applied via .vault-theme wrapper in app/lab/layout.tsx.
+   Uses :has() to bubble up styling to body, header, and footer.
+   =================================================================== */
+
+body:has(.vault-theme) {
+  background-color: #0b0b12;
+}
+
+body:has(.vault-theme) .azure-halo {
+  display: none;
+}
+
+body:has(.contact-page) .azure-halo {
+  display: none;
+}
+
+body:has(.vault-theme) header {
+  background-color: rgba(11, 11, 18, 0.85) !important;
+  border-bottom-color: rgba(253, 251, 247, 0.08) !important;
+}
+
+body:has(.vault-theme) footer {
+  background-color: #0b0b12 !important;
+  border-top-color: rgba(253, 251, 247, 0.08) !important;
+}
+
+body:has(.vault-theme) :is(header, footer) {
+  color: rgba(253, 251, 247, 0.7);
+}
+
+body:has(.vault-theme) .site-title-link {
+  color: rgba(253, 251, 247, 0.7) !important;
+}
+
+body:has(.vault-theme) .site-title-link span[class*="text-ethos-blue"] {
+  color: #fdfbf7 !important;
+}
+
+body:has(.vault-theme) header .site-title-tagline,
+body:has(.vault-theme) header span[aria-hidden] {
+  color: rgba(253, 251, 247, 0.7) !important;
+}
+
+body:has(.vault-theme) .site-title-link:hover .site-title-tagline,
+body:has(.vault-theme) .site-title-link:focus-within .site-title-tagline {
+  color: rgba(253, 251, 247, 0.8) !important;
+}
+
+body:has(.vault-theme) .main-nav a {
+  color: rgba(253, 251, 247, 0.7) !important;
+}
+
+body:has(.vault-theme) .main-nav a[aria-current="page"] {
+  color: #fdfbf7 !important;
+  text-decoration-color: #fdfbf7 !important;
+}
+
+body:has(.vault-theme) :any-link:hover,
+body:has(.vault-theme) :any-link:focus-visible {
+  color: #fdfbf7 !important;
+}
+
+body:has(.vault-theme) a[aria-label="Contact"] {
+  color: rgba(253, 251, 247, 0.7) !important;
+}
+
+body:has(.vault-theme) footer p {
+  color: rgba(253, 251, 247, 0.5) !important;
+}
+
+body:has(.vault-theme) footer a {
+  color: rgba(253, 251, 247, 0.7) !important;
+}
+
+body:has(.vault-theme) .blue-hairline {
+  border-top-color: rgba(253, 251, 247, 0.15);
+}
+
+body:has(.vault-theme) .page-title {
+  color: var(--color-ethos-cream);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ===================================================================
+   Typoglycemia experiment — bounded scroll box
+   Visible thin scrollbar for "you can scroll inside this" affordance.
+   =================================================================== */
+.typo-box {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(253, 251, 247, 0.18) transparent;
+}
+
+.typo-box::-webkit-scrollbar {
+  width: 8px;
+}
+
+.typo-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.typo-box::-webkit-scrollbar-thumb {
+  background-color: rgba(253, 251, 247, 0.18);
+  border-radius: 4px;
+}
+
+.typo-box::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(253, 251, 247, 0.3);
+}

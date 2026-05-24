@@ -6,6 +6,17 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 15:28 — Git initialized; v3.2 committed and tagged
+
+- Files: `.git/` (created — repository).
+- What: Lisa decided the project was complex enough to need version control. Lisa set global git identity (`Lisa Aufox <lisaaufox@gmail.com>`) on her machine; I ran `git init` + `git add -A` + `git commit` + `git tag` in the project root. Existing `.gitignore` (Next.js scaffold default) correctly excluded `node_modules` (516 MB), `.next` (222 MB), `.env.local`, and the TypeScript build cache — no secrets leaked into history. 131 files committed, 25 948 lines.
+- Decisions:
+  - **Local-only**, no GitHub remote. Lisa's hard-drive failure would mean lost work; she accepted that tradeoff for now.
+  - Tag scheme: `chroma-v3.2-correct-spawn` follows the same labeling as the file-system snapshot folder. Future tags should use the same `<feature>-v<n>-<state>` shape.
+  - **File-system snapshot folder kept** (`docs/snapshots/`). Belt-and-suspenders until Lisa is fluent enough with git to trust tags exclusively.
+  - **I never run `git config`**. Identity changes are always Lisa's hands. I caught a placeholder email leak on the first attempt — `your-actual-email@example.com` would have been in commits forever.
+- Going forward: every meaningful change should end with a commit. I'll batch related work and commit at `### Current System State` boundaries unless Lisa says otherwise.
+
 ### 15:17 — Snapshot v3.2 — correct spawn behavior preserved
 
 - Files: `docs/snapshots/chroma-v3.2-correct-spawn/` (created — 9 source files + README).

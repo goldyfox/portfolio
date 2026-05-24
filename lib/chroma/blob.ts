@@ -31,6 +31,15 @@ export type { Vec2 };
 
 export type BlobState = "spawning" | "alive" | "popping";
 
+/**
+ * Inflation factor on the blob's ellipse used by the cursor contact
+ * test. Tuned so contact registers at the apparent (goo-filtered) edge
+ * rather than the raw ellipse boundary. The goo filter expands the
+ * visible silhouette by ~10 px around each blob, plus we want a small
+ * tactile forgiveness — 1.2× covers both. See `applyCursorImpulse`.
+ */
+const CURSOR_CONTACT_SCALE = 1.2;
+
 export interface Blob {
   id: number;
   pos: Vec2;
@@ -195,21 +204,32 @@ export function stepBlob(blob: Blob, dt: number, nowMs: number): void {
 }
 
 /**
- * Apply a Gaussian-falloff cursor impulse to a blob. The blob's velocity
- * is updated; the magnitude attenuates with distance from cursor per
- * fluid-dynamics math (see `gaussianImpulse`).
+ * Apply a contact-based cursor impulse to a blob.
+ *
+ * Physical model: the cursor is a solid object that displaces fluid only
+ * where it physically touches. A blob is moved by the cursor only when
+ * the cursor's position is inside the blob's elliptical body (inflated
+ * to match the goo silhouette via `CURSOR_CONTACT_SCALE`). Blobs the
+ * cursor never touches are NOT directly affected — they only respond
+ * via `applyBlobEntrainment`, which models the fluid coupling that
+ * propagates a touched blob's motion through the medium.
+ *
+ * Pre-v3.3 this used a Gaussian field with σ=200 px, cutoff 600 px —
+ * i.e. one cursor anywhere on the canvas was perturbing every blob in
+ * a ~1200 px sphere. That was conceptually wrong (it modeled the cursor
+ * as a fluid source with its own pressure field) and produced the
+ * "cursor impacts blobs it is nowhere near" symptom Lisa flagged.
  */
 export function applyCursorImpulse(
   blob: Blob,
   cursorPos: Vec2,
   cursorVel: Vec2,
   scale = PHYSICS_DEFAULTS.cursorImpulseScale,
-  sigma = PHYSICS_DEFAULTS.cursorSigma,
 ): void {
   if (blob.state !== "alive") return;
-  const imp = gaussianImpulse(cursorPos, cursorVel, blob.pos, scale, sigma);
-  blob.vel.x += imp.x;
-  blob.vel.y += imp.y;
+  if (!hitTest(blob, cursorPos, CURSOR_CONTACT_SCALE)) return;
+  blob.vel.x += cursorVel.x * scale;
+  blob.vel.y += cursorVel.y * scale;
 }
 
 /**
@@ -279,8 +299,20 @@ export function markPopping(blob: Blob, nowMs: number): void {
   blob.stateStartMs = nowMs;
 }
 
-/** Hit test: returns true if `point` is inside the blob's elliptical body. */
-export function hitTest(blob: Blob, point: Vec2): boolean {
+/**
+ * Hit test: returns true if `point` is inside the blob's elliptical body,
+ * scaled by `scale` (1.0 = raw ellipse, <1 shrinks the hit area, >1
+ * inflates it).
+ *
+ * - `0.8` (default) — pop targeting. Slightly tighter than the visible
+ *   silhouette so the user has to commit; avoids false positives at
+ *   gooey necks between blobs.
+ * - `1.2` — cursor nudge contact test (see `CURSOR_CONTACT_SCALE`).
+ *   Slight forgiveness plus matches the goo filter's ~10 px silhouette
+ *   expansion, so contact registers at the apparent edge rather than
+ *   the raw ellipse boundary.
+ */
+export function hitTest(blob: Blob, point: Vec2, scale = 0.8): boolean {
   if (blob.state !== "alive") return false;
   // Transform point into the blob's local (rotated) coordinate frame.
   const dx = point.x - blob.pos.x;
@@ -289,10 +321,8 @@ export function hitTest(blob: Blob, point: Vec2): boolean {
   const sin = Math.sin(-blob.stretchAngle);
   const localX = dx * cos - dy * sin;
   const localY = dx * sin + dy * cos;
-  // Hit area is slightly smaller than the visible silhouette so pops feel
-  // intentional (no false positives at the gooey neck where blobs merge).
-  const a = blob.currentRadius * blob.stretch * 0.8;
-  const b = (blob.currentRadius / blob.stretch) * 0.8;
+  const a = blob.currentRadius * blob.stretch * scale;
+  const b = (blob.currentRadius / blob.stretch) * scale;
   return (localX * localX) / (a * a) + (localY * localY) / (b * b) <= 1;
 }
 

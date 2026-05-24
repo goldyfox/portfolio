@@ -6,6 +6,19 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 15:45 — Cursor impulse v3.3 — contact-based, not Gaussian field
+
+- Files: `lib/chroma/blob.ts` (edited), `lib/chroma/physics.ts` (edited), `docs/DECISIONS.md` (edited).
+- What: Lisa flagged "cursor is impacting blobs it is nowhere near. Cursor should only impact blob movement if it touches the edge of a blob (like reality)." The v1–v3 Gaussian field model (σ=200 px, 3σ cutoff = 600 px) was perturbing every blob within a 1200 px sphere — conceptually wrong because the cursor isn't a fluid source, it's a solid object. Rewrote to a contact model:
+  - **`applyCursorImpulse`**: replaced `gaussianImpulse(...)` with a direct `hitTest(blob, cursorPos, CURSOR_CONTACT_SCALE)` gate. On contact → full `cursorVel * scale`; no contact → no impulse. Other blobs still respond via the existing `applyBlobEntrainment` (fluid coupling through the medium — physically appropriate at distance).
+  - **`hitTest`** parameterized with optional `scale` (default `0.8` — preserves pop targeting). Single source of truth for ellipse hit math.
+  - **`CURSOR_CONTACT_SCALE = 1.2`** — inflate blob ellipse by 20 % for contact test. Covers the goo filter's ~10 px silhouette expansion plus tactile forgiveness so contact registers at the apparent edge.
+  - **`PHYSICS_DEFAULTS.cursorSigma` removed** (no longer used); `sigma` parameter dropped from `applyCursorImpulse` in the same pass to avoid dead config. `gaussianImpulse` stays — still used by `applyBlobEntrainment` for blob-blob coupling, which IS a physically real long-range effect through the fluid medium.
+- Decisions:
+  - **Contact, not field, for cursor.** The Gaussian-field cursor was the wrong physical analogy from day one. v3.3 fixes the model.
+  - **Tuning levers if it reads too sparse**: `CURSOR_CONTACT_SCALE` (1.4–1.5 for wider effective touch), `cursorImpulseScale` (stronger per-touch impulse), or `blobEntrainScale` (stronger downstream fluid coupling). None require revisiting the model itself.
+- Math sources: own first-principles physics — solid-body contact vs fluid-medium coupling are different mechanisms and should be modeled differently.
+
 ### 15:28 — Git initialized; v3.2 committed and tagged
 
 - Files: `.git/` (created — repository).

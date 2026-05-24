@@ -325,6 +325,22 @@ All motion derives from first principles:
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
 
+### Cursor impulse (v3.3 — contact-based, not Gaussian field)
+
+v1/v2/v3 modeled the cursor as a Gaussian field with σ=200 px and a 3σ cutoff at 600 px — i.e. one cursor anywhere on the canvas was directly perturbing every blob within a ~1200 px sphere. Lisa flagged the symptom: "cursor is impacting blobs it is nowhere near. Cursor should only impact blob movement if it touches the edge of a blob (like reality)."
+
+**Diagnosis**: the Gaussian field was conceptually wrong. It implicitly modeled the cursor as a *fluid source with its own pressure field*. Physically the cursor is a *solid object* that displaces fluid only where it touches. The Gaussian made sense for **blob-to-blob** entrainment (a moving blob really does drag the fluid around it, which couples to other blobs through the medium), but not for the cursor itself.
+
+**Resolution**: contact model.
+
+- **`applyCursorImpulse`** now does a direct contact gate: if `hitTest(blob, cursorPos, CURSOR_CONTACT_SCALE)` returns true, apply the full `cursorVel * cursorImpulseScale` to that blob. Otherwise no impulse.
+- **`CURSOR_CONTACT_SCALE = 1.2`** — the blob's elliptical body inflated 20 %. Covers the ~10 px goo silhouette expansion plus a small tactile forgiveness, so contact registers at the *apparent* edge the user sees, not the raw ellipse.
+- **`hitTest` is now parameterized** with an optional `scale` (default 0.8 — preserves pop targeting). Single source of truth for blob ellipse hit math; pop and nudge use the same function with different scales.
+- **`PHYSICS_DEFAULTS.cursorSigma` removed** — no longer used. The `sigma` parameter dropped from `applyCursorImpulse`'s signature in the same pass.
+- **`gaussianImpulse` stays** — still the right model for `applyBlobEntrainment`, which propagates a touched blob's motion through the fluid coupling to nearby blobs. That's the only path by which non-contact blobs respond to the cursor now: cursor touches A, A's velocity changes, fluid coupling pulls B and C toward A's new trajectory. Two-step propagation, not field-wide.
+
+**Tradeoff**: fewer blobs respond to a single cursor sweep. Compensating factor: each touched blob feels the full impulse (no Gaussian-tapered weakening), and blob-blob entrainment carries the disturbance outward in a physically realistic way. If the result reads as too sparse during heavy mouse activity, options are: bump `CURSOR_CONTACT_SCALE` to 1.4–1.5 (wider effective touch), increase `cursorImpulseScale` (stronger per-touch impulse), or boost `blobEntrainScale` (stronger fluid coupling). None require revisiting the Gaussian-field model.
+
 ### Spawn (v3.2 — pre-roll + cadence calibrated to rise speed)
 
 The strict "blobs only enter from the bottom edge" rule (set in v3.1) creates a tension with first-paint UX. At `vTerminal = -10 px/s` and a ~720 px canvas, a single blob takes ~72 s to traverse from bottom to top. To distribute 18 blobs evenly across that traversal, the cadence has to be ~4 s per spawn. But waiting 72 s for the field to fill on first load is unusable.

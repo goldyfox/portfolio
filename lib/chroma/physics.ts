@@ -248,13 +248,12 @@ export const PHYSICS_DEFAULTS = {
    *  beneath the dominant vertical motion. */
   sigmaDriftX: 2,
   /** Cursor impulse strength (unitless multiplier on cursor velocity).
-   *  v3 had this at 0.45 — a 500 px/s cursor swipe imparted 225 px/s to
-   *  any blob within reach, blowing past terminal by 20×. 0.10 means
-   *  the same swipe maxes a blob at 50 px/s, which is contained by the
-   *  velocity cap below. */
+   *  Applied on direct contact only (see `applyCursorImpulse`'s
+   *  contact-based model). v3 had this at 0.45 — a 500 px/s cursor
+   *  swipe imparted 225 px/s to any blob within reach, blowing past
+   *  terminal by 20×. 0.10 means the same swipe maxes a touched blob
+   *  at 50 px/s, which is contained by the velocity cap below. */
   cursorImpulseScale: 0.1,
-  /** Cursor influence radius (px) — Gaussian σ. */
-  cursorSigma: 200,
   /** Blob-blob entrainment strength. Much smaller than cursor: the
    *  chain reaction is meant to be a whisper, not a wave. */
   blobEntrainScale: 0.015,

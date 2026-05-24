@@ -41,9 +41,11 @@ import {
 } from "@/lib/chroma/blob";
 import { captureToPng } from "@/lib/chroma/capture";
 import {
+  CHROMA_PALETTE_C,
+  CHROMA_PALETTE_HUES,
+  CHROMA_PALETTE_L,
   type Chord,
-  rotateHue,
-  triadicChord,
+  makeBlobHues,
 } from "@/lib/chroma/color";
 import { type Vec2 } from "@/lib/chroma/physics";
 import { makeGrainPattern, renderFrame } from "@/lib/chroma/render";
@@ -54,8 +56,19 @@ const TARGET_BLOB_COUNT_MOBILE = 10;
 /** Mobile breakpoint (px). Mirrors the rest of the portfolio. */
 const MOBILE_BREAKPOINT = 640;
 
-/** Seed-hue rotation rate around the wheel (°/sec). */
-const HUE_ROTATION_RATE = 4;
+/**
+ * Static chord used as a stable identifier for the active palette.
+ * Pre-v4 the chord rotated around the wheel; v4 uses a fixed palette
+ * (see `CHROMA_PALETTE_HUES`) and samples per-blob, so the chord no
+ * longer drifts over time. The Chord object is still passed to
+ * `renderFrame` / `captureToPng` for the filename slug and any future
+ * palette-aware rendering — it just doesn't change frame-to-frame.
+ */
+const STATIC_PALETTE_CHORD: Chord = {
+  hues: [CHROMA_PALETTE_HUES[0], CHROMA_PALETTE_HUES[2], CHROMA_PALETTE_HUES[4]],
+  C: CHROMA_PALETTE_C,
+  L: CHROMA_PALETTE_L,
+};
 
 /**
  * Steady-state spawn cadence. With `PHYSICS_DEFAULTS.vTerminal = -10`
@@ -122,8 +135,7 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
 
     const blobsRef = useRef<Blob[]>([]);
     const nextIdRef = useRef(1);
-    const seedHueRef = useRef<number>(Math.random() * 360);
-    const chordRef = useRef<Chord>(triadicChord(seedHueRef.current));
+    const chordRef = useRef<Chord>(STATIC_PALETTE_CHORD);
     const cursorRef = useRef<CursorState>({
       inside: false,
       pos: { x: 0, y: 0 },
@@ -182,14 +194,12 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
     const spawnBlob = useCallback((nowMs: number) => {
       const { width, height } = sizeRef.current;
       if (width === 0 || height === 0) return;
-      const chord = chordRef.current;
       const radius = Math.min(width, height) * (0.10 + Math.random() * 0.10);
-      const nStops = 2 + (Math.random() < 0.55 ? 1 : 0);
-      const hues: number[] = [];
-      for (let i = 0; i < nStops; i++) {
-        const base = chord.hues[i % chord.hues.length];
-        hues.push((base + (Math.random() - 0.5) * 18 + 360) % 360);
-      }
+      // v4: each blob is a single visual color sampled uniformly from
+      // CHROMA_PALETTE_HUES. The blob's `hues` array still holds 3 values
+      // for the audio chord on pop (`makeBlobHues` adds 2 secondary
+      // palette samples); render only consumes `hues[0]`.
+      const hues = makeBlobHues();
       const id = nextIdRef.current++;
       const spawn = randomEdgeSpawn({ width, height }, radius);
       blobsRef.current.push(
@@ -233,11 +243,8 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
       for (let i = 0; i < steps; i++) {
         virtualNowMs += PREROLL_STEP_MS;
 
-        // Chord rotation (so blobs spawned across the pre-roll get
-        // hues drawn from the chord's natural progression — not all
-        // sampled from a static seed).
-        seedHueRef.current = rotateHue(seedHueRef.current, HUE_ROTATION_RATE, dt);
-        chordRef.current = triadicChord(seedHueRef.current);
+        // v4: palette is static; no chord rotation during pre-roll.
+        // Blobs are sampled uniformly from CHROMA_PALETTE_HUES on spawn.
 
         // No cursor activity during pre-roll. Entrainment + step +
         // lateral constraint follow the same order as the real-time
@@ -301,9 +308,8 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
         // Reduced motion: slow everything down by 90%.
         const dtPhysics = reducedMotionRef.current ? dt * 0.1 : dt;
 
-        // Chord rotation.
-        seedHueRef.current = rotateHue(seedHueRef.current, HUE_ROTATION_RATE, dtPhysics);
-        chordRef.current = triadicChord(seedHueRef.current);
+        // v4: palette is static; no chord rotation. The chordRef holds a
+        // fixed identifier used for filename slugging at capture time.
 
         // Cursor velocity (low-pass smoothed; idle cursor velocity decays).
         const cursor = cursorRef.current;

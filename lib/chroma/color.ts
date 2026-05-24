@@ -179,6 +179,56 @@ export function rotateHue(currentHue: number, degreesPerSecond: number, dt: numb
 }
 
 // ---------------------------------------------------------------------------
+// Chroma Capture palette (v4)
+//
+// Curated 6-hue analogous-warm palette spanning 130° on the OKLCH wheel.
+// Every pair of hues sits within ~70° of each other, so every overlap
+// blend produces a vibrant intermediate hue rather than collapsing to
+// gray (which is what happens with triadic / complementary chords in
+// OKLab). Order is anatomical, not aesthetic — sampled uniformly by
+// `randomPaletteHue`.
+//
+// Curated, not algorithmic: these are six anchor points chosen by hand
+// against the kuro.store reference image and standard analogous-warm
+// theory. Skip 180–270 entirely (cool side) — those hues paired with
+// the warm anchors would produce muddy mid-tones in any blend.
+// ---------------------------------------------------------------------------
+
+export const CHROMA_PALETTE_HUES = [
+  285, // indigo / deep violet
+  315, // magenta
+  350, // crimson
+  15,  // coral
+  35,  // tangerine
+  55,  // goldenrod
+] as const;
+
+/** Common OKLCH lightness for every palette hue. */
+export const CHROMA_PALETTE_L = 0.66;
+/** Common OKLCH chroma for every palette hue. In-sRGB-gamut across the
+ *  warm-side palette; would clip on cool / cyan hues at this saturation. */
+export const CHROMA_PALETTE_C = 0.22;
+
+/** Return one hue from the palette, uniformly sampled. */
+export function randomPaletteHue(): number {
+  return CHROMA_PALETTE_HUES[Math.floor(Math.random() * CHROMA_PALETTE_HUES.length)];
+}
+
+/**
+ * Build a 3-hue audio chord centered on a primary hue. The primary is
+ * one palette hue (the blob's visual color); the secondary and tertiary
+ * are independent palette samples (allowed to repeat — the audio layer
+ * dedupes by frequency). Multi-hue per blob lets `playChord` produce a
+ * harmonically-related cluster on pop while the visual stays single-hue.
+ */
+export function makeBlobHues(primaryHue?: number): number[] {
+  const primary = primaryHue ?? randomPaletteHue();
+  const secondary = randomPaletteHue();
+  const tertiary = randomPaletteHue();
+  return [primary, secondary, tertiary];
+}
+
+// ---------------------------------------------------------------------------
 // Utility re-exports
 // ---------------------------------------------------------------------------
 

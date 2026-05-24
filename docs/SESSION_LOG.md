@@ -6,6 +6,26 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 22:55 — Chroma Capture v4 — color palette + soft-alpha + atop composition
+
+- Files: `lib/chroma/color.ts` (edited), `lib/chroma/render.ts` (edited), `lib/chroma/capture.ts` (edited), `components/lab/chroma-capture-canvas.tsx` (edited), `components/lab/chroma-capture-section.tsx` (edited), `docs/DECISIONS.md` (edited).
+- What: Lisa restated her color brief plainly — pick a palette, make sure it looks good on the color wheel, and when blobs merge produce a soft gradient that preserves blur + texture. Implemented v4 in one pass:
+  - **Palette**: curated 6-hue analogous-warm at OKLCH L=0.66 C=0.22 — `CHROMA_PALETTE_HUES = [285 indigo, 315 magenta, 350 crimson, 15 coral, 35 tangerine, 55 goldenrod]`. 130° span on the warm side; every pair within ~70° so blends stay vibrant (analogous theory) rather than collapsing to gray.
+  - **Sampling**: `randomPaletteHue()` uniform per blob; `makeBlobHues()` returns `[primary, secondary, tertiary]` where primary is the visual color and the other two are independent palette samples that drive the audio chord on pop.
+  - **Static, not rotating**. Chord rotation (`rotateHue` / `seedHueRef` / `HUE_ROTATION_RATE`) removed from `chroma-capture-canvas.tsx`. The `chordRef` now holds a fixed `STATIC_PALETTE_CHORD` (3 representative hues) for filename slugging. Pre-roll lost its chord-rotation step (palette is constant) — physics order in pre-roll unchanged otherwise so distribution stays correct.
+  - **Render**: `drawBlob` now draws a radial alpha gradient at `RENDER_OVERSCAN = 1.25` × `currentRadius` with stops `[0.0,1.0] [0.4,0.85] [0.7,0.55] [0.9,0.25] [1.0,0]`. Elliptical stretch encoded as non-uniform `ctx.scale` so the radial gradient becomes elliptical when drawn. The 1.25 overscan compensates for the soft alpha shrinking the visible silhouette under the goo threshold so net silhouette ≈ v3.2.
+  - **SVG filter**: appended `<feComposite in="SourceGraphic" in2="goo" operator="atop" />` to `<filter id="chroma-goo">` in `chroma-capture-section.tsx`. Blur σ=10 and threshold matrix `18 -7` are UNCHANGED — motion read is preserved. atop (not feBlend) is the correct operator because it clips strictly to the goo silhouette without extending it.
+  - **Grain**: bumped to 14% via `globalCompositeOperation = "source-atop"`. Replaces the v3 6% multiply. source-atop blends grain colors only where canvas is already opaque (inside blob area) and leaves alpha untouched, so silhouette boundary is preserved exactly.
+  - **Capture**: `lib/chroma/capture.ts` updated to replicate the full atop chain in JS — `globalCompositeOperation = "source-atop"` draws stage1 (source colors) on top of stage2 (goo silhouette), then grain at 14% with the same source-atop rule, then watermark with composite reset to source-over. PNG output is now droppable on any background and matches the live render. Filename gained a `YYYYMMDD-HHMMSS` timestamp so static-palette captures don't collide.
+- Decisions:
+  - **Cool side of wheel excluded**. Pairing teal/cyan with the warm anchors produces muddy mid-tones in any overlap and violates "gracefully blends." Also C=0.22 clips on cyans.
+  - **Static palette over rotating**. Lisa asked for "a palette" (singular); identifiability across loads is a portfolio asset; rotation is one line away in `rotateHue` if we change our minds.
+  - **atop, not feBlend**. atop preserves the goo silhouette boundary exactly; feBlend would extend it to wherever source has any alpha (i.e. the 1.25× overscan halo), reintroducing the motion regression that caused the earlier v4 revert.
+  - **1.25 overscan estimated, not measured**. Profile-based estimate of where the threshold cuts a soft-alpha gradient. Will calibrate by eye in the live render; constant lives at the top of `render.ts` for easy tuning.
+  - **Capture includes grain in v4** (v3 omitted). Lisa called "texture" out explicitly as part of the desired artifact.
+  - **Did NOT change**: `physics.ts`, `blob.ts`, goo filter blur/threshold values, cursor model (still v3.3), spawn behavior (still v3.2). v4 is strictly the color + composition layer.
+- Math sources: OKLCH analogous-palette theory; `feComposite` Porter-Duff atop spec (https://www.w3.org/TR/SVG11/filters.html#feCompositeElement); canvas 2D `source-atop` composite mode (HTML Canvas spec); alpha-blending math derived from the goo threshold equation `a' = 18a - 7`.
+
 ### 15:45 — Cursor impulse v3.3 — contact-based, not Gaussian field
 
 - Files: `lib/chroma/blob.ts` (edited), `lib/chroma/physics.ts` (edited), `docs/DECISIONS.md` (edited).

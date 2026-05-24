@@ -1,28 +1,34 @@
 /**
- * PNG capture for Chroma Capture.
+ * PNG capture for Chroma Capture (v4 — palette + atop composition).
  *
- * v3 note: the live render relies on a CSS `filter: url(#chroma-goo)`
- * applied to the canvas element via the wrapping React component.
- * `canvas.toBlob()` returns the RAW canvas pixels without the CSS
- * filter applied — so naive capture would produce un-merged ellipses,
- * not the lava-lamp silhouettes.
+ * The live render relies on a CSS `filter: url(#chroma-goo)` applied
+ * to the canvas element. `canvas.toBlob()` returns the RAW canvas
+ * pixels without the CSS filter — so we replicate the full SVG filter
+ * chain in JS:
  *
- * To bake the goo effect into the captured PNG we replicate the SVG
- * filter pipeline in JS: render blobs → canvas-native blur to a second
- * offscreen → walk the resulting ImageData and threshold the alpha
- * channel exactly the way `feColorMatrix` would (`a' = a·M − O·255`,
- * clamped). This is slow (~tens of ms for a 2× DPR canvas) but only
- * runs once per capture. Watermark drawn on top after the goo bake.
+ *   1. Render blobs (soft alpha, palette colors) to `stage1`.
+ *   2. Blur `stage1` → `stage2` (canvas-native CSS filter is fine here;
+ *      only `url()` references were the problem).
+ *   3. Threshold `stage2`'s alpha channel pixel-by-pixel — equivalent
+ *      to `feColorMatrix` row `0 0 0 18 -7`. This is the goo silhouette.
+ *   4. Composite `stage1` atop `stage2` on the output canvas via
+ *      `globalCompositeOperation = "source-atop"` — equivalent to
+ *      `feComposite operator="atop"`. Clips source colors strictly to
+ *      the goo silhouette while preserving the soft inner gradient
+ *      shape (the gradient-merge effect at overlap boundaries).
+ *   5. Grain — also `source-atop`, 14% alpha — stays inside silhouette.
+ *   6. Watermark on top.
  *
- * Grain is intentionally OFF in the capture — the cream + grain field
- * is the LIVE gallery framing, not the artifact. The PNG is the
- * artifact, droppable onto any background.
+ * Grain IS included in v4 captures (vs. v3 where it was omitted): the
+ * film texture is part of the artifact aesthetic the user requested.
+ * The cream FRAME stays out of the PNG; everything outside the goo
+ * silhouette has alpha=0, so the PNG drops cleanly onto any background.
  */
 
 import { type Blob } from "./blob";
 import { hueChordSlug } from "./color-names";
 import { type Chord } from "./color";
-import { drawWatermark, renderFrame } from "./render";
+import { drawWatermark, makeGrainPattern, renderFrame } from "./render";
 
 const CAPTURE_DPR = 2;
 
@@ -34,6 +40,8 @@ const CAPTURE_DPR = 2;
 const GOO_BLUR_PX = 10;
 const GOO_ALPHA_MULT = 18;
 const GOO_ALPHA_OFFSET_255 = 7 * 255;
+/** Match `GRAIN_ALPHA` in render.ts. */
+const GRAIN_ALPHA = 0.14;
 
 export interface CaptureOptions {
   /** Visible canvas width in CSS pixels. */
@@ -96,13 +104,41 @@ export async function captureToPng(opts: CaptureOptions): Promise<boolean> {
   }
   c2.putImageData(img, 0, 0);
 
-  // ---- Stage 4: final canvas — goo'd blobs + watermark ----
+  // ---- Stage 4: atop composition — source colors clipped to goo ----
   const out = document.createElement("canvas");
   out.width = stage2.width;
   out.height = stage2.height;
   const co = out.getContext("2d");
   if (!co) return false;
+
+  // 4a. Goo silhouette as the destination layer (blurred + thresholded).
+  //     Inside the silhouette we have blurred source colors; outside is
+  //     fully transparent.
   co.drawImage(stage2, 0, 0);
+
+  // 4b. feComposite atop equivalent. Draws stage1 (crisp source colors
+  //     with soft alpha) on top of the goo silhouette but ONLY where
+  //     the silhouette is opaque. Outside the silhouette: untouched
+  //     (still transparent). Inside the silhouette where stage1 has
+  //     partial alpha: blended with the goo's blurred colors (mostly
+  //     visible in gooey-neck regions where stage1 alpha is zero).
+  co.globalCompositeOperation = "source-atop";
+  co.drawImage(stage1, 0, 0);
+
+  // 4c. Grain inside the silhouette only. Same source-atop rule keeps
+  //     the cream-frame area clean. Alpha is unaffected by source-atop
+  //     so silhouette boundary is preserved.
+  const grainPattern = makeGrainPattern(co);
+  if (grainPattern) {
+    co.globalAlpha = GRAIN_ALPHA;
+    co.fillStyle = grainPattern;
+    co.fillRect(0, 0, out.width, out.height);
+    co.globalAlpha = 1;
+  }
+
+  // Reset composite op for the watermark (drawn over everything).
+  co.globalCompositeOperation = "source-over";
+
   // Watermark in CSS-pixel space so font sizing matches the live UI.
   co.save();
   co.scale(CAPTURE_DPR, CAPTURE_DPR);
@@ -128,7 +164,24 @@ export async function captureToPng(opts: CaptureOptions): Promise<boolean> {
   });
 }
 
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+function formatTimestamp(d: Date): string {
+  return (
+    `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}` +
+    `-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`
+  );
+}
+
+/**
+ * `chroma-capture-{slug}-{YYYYMMDD-HHMMSS}.png`. v4 uses a static
+ * palette so the slug alone would collide across captures — the
+ * timestamp guarantees uniqueness and sorts chronologically in the
+ * downloads folder.
+ */
 function buildFilename(chord: Chord): string {
   const slug = hueChordSlug(chord.hues as unknown as number[]);
-  return `chroma-capture-${slug}.png`;
+  return `chroma-capture-${slug}-${formatTimestamp(new Date())}.png`;
 }

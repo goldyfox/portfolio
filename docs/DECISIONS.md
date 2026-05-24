@@ -325,6 +325,47 @@ All motion derives from first principles:
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
 
+### Color (v4 — static warm-vibrant palette + soft alpha + feComposite atop)
+
+v1–v3.3 ran mono ethos-blue while shape and motion were tuned. v4 reintroduces color. Lisa's brief: "Pick a color palette that each blob generates as a specific color. Use the color wheel to make sure all colors look good together. ... When two or more blobs start merging, produce a gradient patterned effect ... that preserves blur, texture, and gracefully blends from one color into the next." Reference image: kuro.store-style warm analogous (purple/red/orange/yellow) with grain texture.
+
+**Hard constraint** (carried from a v4 attempt that was reverted): the goo filter values that define silhouette behavior — `stdDeviation=10`, `feColorMatrix` alpha row `18 -7` — **must not change**. Any change to those values is felt as a motion regression because the visible silhouette shape (which is what the eye reads as "the blob") is determined by them.
+
+**Palette decision: curated 6-hue analogous-warm palette** at fixed OKLCH L=0.66 C=0.22.
+
+```ts
+CHROMA_PALETTE_HUES = [285, 315, 350, 15, 35, 55]
+//                    indigo  magenta  crimson  coral  tangerine  goldenrod
+```
+
+- 130° span on the warm side of the OKLCH wheel. Every pair sits within ~70° — any blend produces a vibrant intermediate hue (analogous theory). Cool side (180–270°) excluded entirely: paired with the warm anchors those would produce muddy mid-tones in any overlap, contradicting "gracefully blends." Cyans / teals would also exceed sRGB at C=0.22 and clip.
+- L=0.66 is vivid-not-pastel; C=0.22 is high saturation while staying in-gamut across this hue range. Verified by inspection of `oklchToHex` for all six hues.
+- **Static, not rotating.** Pre-v4 the chord rotated 4°/s around the wheel; v4 holds the palette fixed. Rationale: Lisa's prompt asked for "a color palette" (singular), and a static palette makes the page identifiable across loads — the same 6 hues are the artwork's signature. If page rhythm starts feeling repetitive in practice, rotation is one line away (`rotateHue` still exists in `color.ts`).
+- **Sampling: uniform** per blob via `randomPaletteHue`. No weighting, no avoiding repetition. With 6 hues and ~18 blobs on screen, the law of large numbers gives every chord visible at any moment.
+- **Per-blob hue array carries 3 values** (`makeBlobHues`): primary (the visual color) + 2 secondary palette samples. Visual rendering only consumes `hues[0]`; the secondary hues drive the audio chord on pop so the pop sound stays multi-note even though the visual is single-color.
+
+**Merging — the gradient effect at overlap.** This is the trick. Three layers cooperate:
+
+1. **Soft alpha gradient per blob.** Each blob renders as a radial gradient — opaque core fading to transparent edge — instead of a hard-alpha ellipse. Stops: `[0.0,1.0] [0.4,0.85] [0.7,0.55] [0.9,0.25] [1.0,0]`. This is what produces "stronger opacity in the middle." On its own, the soft alpha would shrink the visible silhouette dramatically because the goo filter's `18a-7` threshold cuts at blurred alpha ≈ 0.39.
+2. **`RENDER_OVERSCAN = 1.25`** compensates. Each blob is drawn at 1.25× its `currentRadius` so the threshold lands roughly where v3.2's hard ellipse edge was. Net visible silhouette ≈ identical to v3.2 → motion read preserved. The 1.25 was estimated from the alpha-stop profile and the threshold position; if it looks off it can be tuned in the constant without touching anything else.
+3. **`feComposite operator="atop" in="SourceGraphic" in2="goo"`** appended to the SVG filter chain. The goo layer (blur + threshold) provides the merged silhouette mask; the atop step paints SourceGraphic colors inside that mask, leaving everything outside it transparent.
+
+How this produces the gradient at overlaps:
+
+- Two blobs of different palette hues approach. Their soft-alpha gradients overlap at the edges first. Canvas alpha compositing blends the source colors smoothly across the partial-alpha region (e.g. 0.4 alpha A over 0.4 alpha B = ~30% A + ~30% B by area-weighted color).
+- The goo silhouette merges into a single amorphous shape via the blur+threshold (unchanged from v3.2).
+- `feComposite atop` shows the soft-blended source colors INSIDE that merged silhouette. In gooey-neck regions where neither blob's source has alpha, the blurred goo layer (a darker mix from the blur) fills in — which looks like a soft mid-tone gradient between the two blob hues.
+
+Critically, `atop` (not `feBlend`) is the right operator. `feBlend in="SourceGraphic" in2="goo"` with `mode="normal"` would extend the visible silhouette out to wherever SourceGraphic has any alpha at all (including the rendered overscan halo) — a motion read regression. `atop` clips strictly to the goo silhouette so the boundary is identical to v3.2.
+
+**Grain at 14% via `globalCompositeOperation = "source-atop"`** (up from 6% multiply). source-atop blends grain colors only where the canvas is already opaque (i.e. inside the blob soft-alpha region) and leaves alpha untouched, so the silhouette boundary set by the goo threshold is preserved. The previous 6% multiply slightly extended alpha into the gap regions (relying on the threshold to cut it) — source-atop is the cleaner model and the higher 14% reads as the analog film texture Lisa asked for.
+
+**Capture parity.** The capture pipeline in `lib/chroma/capture.ts` replicates the full v4 filter chain in JS: render → blur → threshold → composite SourceGraphic atop via `globalCompositeOperation = "source-atop"` → grain inside silhouette → watermark. The 14% grain is now included in the PNG (v3 omitted grain from captures; v4 includes it because Lisa explicitly called out "texture" as part of the artifact).
+
+**Filename: `chroma-capture-{slug}-{YYYYMMDD-HHMMSS}.png`.** With the static palette the slug alone would collide across captures; the timestamp guarantees uniqueness and makes the downloads folder sort chronologically.
+
+**What this does NOT change**: `physics.ts` (untouched), `blob.ts` (untouched), the goo filter's blur σ and threshold (untouched), cursor impulse model (still v3.3 contact-based), spawn cadence and pre-roll (still v3.2). The change set is strictly: palette constants, render function (drawBlob + grain mode), SVG filter (one new primitive), and capture pipeline (mirrors the new filter step). If color reads wrong Lisa can revert to mono by reverting the v4 commit without disturbing motion.
+
 ### Cursor impulse (v3.3 — contact-based, not Gaussian field)
 
 v1/v2/v3 modeled the cursor as a Gaussian field with σ=200 px and a 3σ cutoff at 600 px — i.e. one cursor anywhere on the canvas was directly perturbing every blob within a ~1200 px sphere. Lisa flagged the symptom: "cursor is impacting blobs it is nowhere near. Cursor should only impact blob movement if it touches the edge of a blob (like reality)."

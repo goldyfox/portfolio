@@ -1,32 +1,77 @@
 /**
- * Canvas rendering pipeline for Chroma Capture (v3 — mono shape pass).
+ * Canvas rendering pipeline for Chroma Capture (v4 — palette + soft gradients).
  *
  * The goo / metaball effect is applied as a CSS `filter: url(#chroma-goo)`
  * on the canvas element by the wrapping React component — NOT via the
- * canvas 2D API. This is the canonical pattern across every popular
- * lava-lamp / metaball implementation on GitHub (n3r4zzurr0/canvas-
- * liquid-effect, Saganaki22/LofiLamp, Bret Cameron's tutorial, every
- * CSS-Tricks gooey demo). `ctx.filter = "url(#id)"` is unreliable
- * across browsers and was broken in our Chrome test; CSS filters work
- * everywhere because they run in the browser compositor.
+ * canvas 2D API. The filter chain is: blur(σ=10) → alpha threshold
+ * (matrix 18 -7) → feComposite atop SourceGraphic. The first two steps
+ * define the merged amorphous silhouette (motion read); the atop step
+ * re-introduces source colors clipped strictly to that silhouette.
  *
- * This file therefore stays simple: clear → draw solid-color ellipses
- * for each blob → grain overlay → watermark (capture only) → flash
- * (live only). The blobs are intentionally mono in v3 so Lisa can
- * judge shape + motion before color is reintroduced.
+ * v4 colors:
+ *   • Each blob picks one hue from `CHROMA_PALETTE_HUES` (analogous-warm
+ *     6-hue palette at OKLCH L=0.66 C=0.22).
+ *   • Rendered as a radial alpha gradient (opaque core → transparent edge)
+ *     at 1.25× v3.2 radius. The 1.25× compensates for the soft alpha
+ *     shrinking the threshold-defined silhouette; net visible silhouette
+ *     lands at the same place as v3.2's hard ellipse.
+ *   • Where two blobs overlap, canvas alpha compositing blends their
+ *     source colors. `feComposite atop` shows those blended colors inside
+ *     the unchanged goo silhouette — that is the gradient-merge effect.
  *
- * NO `ctx.filter` calls. NO half-res offscreen. NO `metaballCanvas`
- * plumbing. The CSS filter on the canvas element handles the goo.
+ * Grain: 14% via `globalCompositeOperation = "source-atop"` — grain colors
+ * blend toward blob pixels only; cream-frame transparent area stays clean.
+ * source-atop leaves destination alpha untouched, so silhouette boundary
+ * is unaffected.
+ *
+ * NO `ctx.filter` calls. NO half-res offscreen. The CSS filter on the
+ * canvas element handles the goo + atop composition.
  */
 
 import { type Blob, popDisplay } from "./blob";
-import { type Chord } from "./color";
+import {
+  CHROMA_PALETTE_C,
+  CHROMA_PALETTE_L,
+  type Chord,
+  oklchToRgba,
+} from "./color";
 
 /**
- * Mono blob fill — ethos-blue. Once shape + motion is approved we'll
- * replace this with per-blob multi-color gradients again.
+ * Radius multiplier applied at draw time. The soft alpha gradient
+ * shrinks the visible silhouette under the goo filter's threshold
+ * (visible boundary lands where blurred-alpha = ~0.39). 1.25× pushes
+ * the rendered edge out so the threshold cut lands at the same place
+ * as v3.2's hard ellipse. Calibrated by inspection; preserves motion
+ * read exactly.
  */
-const BLOB_COLOR = "#1313ec";
+const RENDER_OVERSCAN = 1.25;
+
+/**
+ * Soft alpha gradient stops for each blob (radial, normalized 0–1).
+ * Opaque core fading to transparent edge. The threshold in the SVG
+ * filter cuts roughly at 0.39 blurred alpha → with these stops the
+ * visible silhouette ends near r=0.8 of the rendered radius.
+ *
+ * Why these specific stops: dense opaque core (0–40%) is what reads as
+ * "stronger opacity in the middle"; the 40–90% taper is what produces
+ * the soft inner gradient when blobs overlap (canvas alpha compositing
+ * mixes the two source colors smoothly across the partial-alpha edges).
+ */
+const ALPHA_STOPS: ReadonlyArray<[number, number]> = [
+  [0.00, 1.00],
+  [0.40, 0.85],
+  [0.70, 0.55],
+  [0.90, 0.25],
+  [1.00, 0.00],
+];
+
+/**
+ * Grain opacity inside blob pixels. Applied with `source-atop` so the
+ * cream frame outside the goo silhouette stays clean. 14% is loud
+ * enough to read as analog film texture without overwhelming the
+ * palette colors.
+ */
+const GRAIN_ALPHA = 0.14;
 
 export interface RenderOptions {
   /** Visible canvas width in CSS pixels (NOT device pixels). */
@@ -81,10 +126,15 @@ export function makeGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern |
 // ---------------------------------------------------------------------------
 
 /**
- * Draw a single blob as a solid stretched ellipse. The CSS goo filter
- * applied to the canvas element softens edges and merges overlapping
- * blobs — this function just needs to emit a clean alpha shape with
- * the right footprint.
+ * Draw a single blob as a soft-alpha radial gradient at the blob's
+ * primary palette hue. The CSS goo filter on the canvas element
+ * provides the merged silhouette + atop composition; this function
+ * emits the source colors and soft alpha that the filter operates on.
+ *
+ * Geometry: the ellipse stretch is encoded as a non-uniform `ctx.scale`,
+ * which lets a circular radial gradient become an elliptical one when
+ * drawn through the scaled transform. (Canvas 2D's radial gradient
+ * doesn't support elliptical natively.)
  */
 function drawBlob(ctx: CanvasRenderingContext2D, blob: Blob, nowMs: number): void {
   let radius = blob.currentRadius;
@@ -97,16 +147,25 @@ function drawBlob(ctx: CanvasRenderingContext2D, blob: Blob, nowMs: number): voi
   }
   if (radius <= 0.5 || alphaMult <= 0.01) return;
 
-  const a = radius * blob.stretch;
-  const b = radius / Math.max(0.1, blob.stretch);
+  const renderR = radius * RENDER_OVERSCAN;
+  const stretch = Math.max(0.1, blob.stretch);
+  const hue = blob.hues[0] ?? 0;
+  const color = { L: CHROMA_PALETTE_L, C: CHROMA_PALETTE_C, h: hue };
 
   ctx.save();
   ctx.translate(blob.pos.x, blob.pos.y);
   ctx.rotate(blob.stretchAngle);
+  ctx.scale(stretch, 1 / stretch);
   ctx.globalAlpha = alphaMult;
-  ctx.fillStyle = BLOB_COLOR;
+
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, renderR);
+  for (const [stop, alpha] of ALPHA_STOPS) {
+    grad.addColorStop(stop, oklchToRgba(color, alpha));
+  }
+
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, a, b, 0, 0, Math.PI * 2);
+  ctx.arc(0, 0, renderR, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -188,15 +247,15 @@ export function renderFrame(
     drawBlob(ctx, b, nowMs);
   }
 
-  // 3. Grain overlay (live view only). Drawn ON TOP of the goo output
-  //    once the CSS filter has been applied — but since the filter is
-  //    applied to the entire canvas in the compositor, the grain
-  //    actually gets goo'd too. That's OK for now; if it reads weird
-  //    we'll move grain to a separate non-filtered DOM layer.
+  // 3. Grain overlay. `source-atop` constrains grain to opaque blob
+  //    pixels only — the cream frame stays clean. Alpha unchanged,
+  //    so silhouette boundary (set by goo threshold) is untouched.
+  //    The CSS filter still processes everything, but at 14% the
+  //    blur smearing is part of the desired analog texture.
   if (includeGrain && grainPattern) {
     ctx.save();
-    ctx.globalAlpha = 0.06;
-    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = GRAIN_ALPHA;
+    ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = grainPattern;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();

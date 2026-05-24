@@ -63,16 +63,30 @@ export function ChromaCaptureSection() {
     <section id="chroma-capture" className="mt-macro">
       {/*
         Hidden SVG goo filter — referenced by the canvas element via its
-        CSS `filter: url(#chroma-goo)` style. This is the canonical
-        n3r4zzurr0 / Bret Cameron / CSS-Tricks pattern: blur the alpha
-        edges with `feGaussianBlur`, then snap them back to hard
-        silhouettes via `feColorMatrix` on the alpha row only. RGB is
-        untouched so any internal color survives. Where two shapes'
-        alpha fields overlap during blur, the threshold produces a
-        smooth gooey neck — true metaball merging.
+        CSS `filter: url(#chroma-goo)` style. v4 pipeline:
 
-        Values match the most widely-used preset (`stdDeviation 10`,
-        matrix multiplier 18, offset -7). Tune here, not at the canvas.
+          1. feGaussianBlur (σ=10) — smear alpha edges so neighboring
+             blobs' alpha fields overlap.
+          2. feColorMatrix (alpha row: 18 -7) — snap blurred alpha back
+             to a hard amorphous silhouette. Cuts at ~0.39 blurred alpha.
+             This is the merged metaball outline. RGB rows are identity
+             so source colors survive untouched on this layer.
+          3. feComposite atop SourceGraphic — overlay the ORIGINAL
+             source pixels on top of the goo silhouette, clipped strictly
+             to the silhouette. Where the source has soft alpha (the
+             blob's gradient core/edge), the source color shows; where
+             the source has zero alpha (the gooey neck between blobs),
+             the blurred goo color fills in. Net effect: amorphous
+             silhouette (unchanged from v3.2) + soft internal source
+             colors visible inside it.
+
+        Steps 1+2 alone (v3.2) define the silhouette — so motion read
+        is preserved exactly. Step 3 only changes what color paints
+        inside the silhouette; it does not extend the silhouette.
+
+        Values 10 / 18 / -7 are the canonical CSS-Tricks preset. Tune
+        here, not at the canvas. Capture pipeline (lib/chroma/capture.ts)
+        replicates these three steps in JS.
       */}
       <svg
         aria-hidden
@@ -91,6 +105,7 @@ export function ChromaCaptureSection() {
                       0 0 0 18 -7"
               result="goo"
             />
+            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
           </filter>
         </defs>
       </svg>

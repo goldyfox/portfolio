@@ -6,6 +6,52 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 19:42 — Session close — unlogged copy + style tweaks
+
+Catching trailing iterations that fell below per-entry logging threshold:
+
+- **Chroma subtitle**, three iterations: removed "colors play as chords" (sound stays a discovery) → tried "Liquid color. Move through it. Save the moments you make." → final: "Liquid color. Move it, pop it. Save the moments you make." (the comma pair gives rhythm; "pop it" surfaces the click interaction without spoiling the sound).
+- **Typoglycemia subtitle**: "An essay you decode by scrolling." → "Scrambled letters your brain reads anyway. Scroll to watch them resolve." Leads with the cognitive paradox (Rawlinson) instead of the mechanic; "resolve" matches the visual.
+- **Reset CTA restyle**: centered vertically inside the 540 px runway (was: bottom-aligned after a 500 px spacer); `font-semibold`, `text-white` (full strength), icon stroke 1.4 → 1.7 to match the bolder text weight.
+
+### 19:35 — Chroma Capture — Safari Pass 3 (JS-baked goo, CSS filter dropped)
+
+- Files: `lib/chroma/render.ts` (edited — new `renderFrameBaked` function), `components/lab/chroma-capture-canvas.tsx` (edited — stages, branch in tick, conditional filter).
+- What: Pass 1+2 (DPR cap + GPU hints) didn't move the needle on Safari, so escalated to Pass 3: bake the entire goo filter chain in JS on Safari and drop the CSS `filter: url(#chroma-goo)` from the canvas style. The visual output matches Chrome's CSS-filter pipeline frame-for-frame — same blurs (σ=10 + σ=25), same threshold (×30, −11.7×255), same alpha boost (×1.15) — but Safari now handles each filter primitive as a discrete canvas operation it CAN GPU-accelerate, instead of a compound SVG-filter graph it can't pipeline.
+- New API: `renderFrameBaked(visibleCtx, stages, blobs, opts)` in render.ts. Stages are three offscreen canvases (stage1 = solid blobs DPR-scaled, stage2 = silhouette mask, stage3 = soft color cloud), all created and sized inside `applySize` on Safari only. The function mirrors `captureToPng`'s pipeline but writes through the visible canvas and adds the flash overlay.
+- Chrome path is bit-for-bit unchanged: still uses the CSS filter URL, still calls regular `renderFrame`, no stages allocated, no extra memory.
+- Decisions:
+  - **Match Chrome's pipeline exactly**, including the alpha boost. Skipping it would have saved one pixel pass (~3 ms) but Safari output would be more pastel than Chrome — divergent visuals across browsers is a worse outcome than a slightly tighter Safari frame budget.
+  - **One bake function in render.ts**, not factored shared with `captureToPng`. The capture path runs once per click; refactoring for ~30 lines of overlap isn't worth the abstraction cost. They can converge later if a third caller appears.
+  - **Ref + state pattern** for Safari detection: `isSafariRef` for tick (no stale closure), `isSafari` state for JSX (clean SSR/hydration). Detection effect declared BEFORE mount effect so the ref is set before tick starts.
+  - **Stages cached on refs**, not recreated per frame. ResizeObserver-driven `applySize` resizes them when the visible canvas resizes.
+  - **GPU hints removed** (were Pass 1). With the CSS filter gone on Safari there's no live filter for `will-change: filter` to optimize.
+
+### 19:28 — Chroma Capture — Safari perf pass (DPR cap + GPU hints)
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited).
+- What: Two Safari-only mitigations for the live SVG filter chain (σ=10 + σ=25 + composite + threshold), which is GPU-accelerated on Chrome/Firefox but CPU-bound on WebKit. At DPR=2 on retina (3M backing-store pixels) Safari can't hold 60fps; visitors saw stutter.
+  1. **DPR cap**: Safari users render at DPR=1 (was 2). Halves backing-store pixel count → halves per-frame filter cost. Goo filter blurs everything anyway, so the crispness loss is imperceptible in motion.
+  2. **GPU compositing hints** on the canvas element: `will-change: filter` + `transform: translate3d(0,0,0)` to coerce WebKit into promoting the canvas to its own GPU layer instead of CPU-repainting it each frame.
+- Both gated on `detectSafari()` (UA-sniff for Safari excluding Chrome/Android). Chrome's path is bit-for-bit identical to the pre-pass code — same DPR=2, same style object, same compositing.
+- Decisions:
+  - **UA sniff over feature detect**: the perf delta is browser-engine specific; there's no feature-detection signal for "slow filter compositor." UA-sniff is the standard for browser-perf workarounds.
+  - **Detection in two layers**: `detectSafari()` called inline inside `applySize` (no stale-closure risk; resize observer batch re-detects each call) for the DPR cap. State variable `isSafari` set via post-mount `useEffect` for the JSX style spread (avoids SSR/hydration mismatch — both server and client first render see `isSafari=false`; Safari path kicks in via re-render after mount).
+  - **Did not change SVG filter parameters**. Reducing σ would weaken the goo effect for everyone; the DPR halving achieves the same per-frame reduction without touching visual fidelity.
+  - **Did not skip CSS filter entirely** (would be a JS bake-in pipeline on Safari only — Pass 3 in the plan). Holding that in reserve in case Passes 1+2 aren't enough.
+
+### 19:17 — Typoglycemia — fix unscramble bug + add reset button
+
+- Files: `components/lab/typoglycemia-section.tsx` (edited).
+- What: Two things in one pass.
+  1. **Bug fix**: at full 720px box height, the last 1–2 essay paragraphs could never unscramble because there wasn't enough scroll runway below them. Math: for a word to cross the demarcation line at `top: 120px`, the runway below the last essay word must be at least `clientHeight − 120` ≈ 600px. Currently only ~120px exists (hr + attribution + padding). Added a 500px runway div between attribution and the new reset button; reset block + bottom padding fills the rest. Worst-case math now clears.
+  2. **Reset button**: refresh icon + "Reset experiment" text, centered, font-sans 13px, /60 opacity, hover ethos-blue. Click smooth-scrolls box to top + immediately re-scrambles body words (replaces clean set with intro-only). After scroll settles (~700ms), re-measures and re-syncs.
+- Decisions:
+  - **Option A (reset at bottom)**, not Option B (reset at +200px below essay). Reset at bottom doubles as a natural "end of experience" anchor and the 500px above it does real scroll-runway work instead of being dead air.
+  - **Body scrambles immediately on click**, not at scroll-end. Instant visual confirmation that reset fired. The smooth scroll then animates through already-scrambled body.
+  - **`isResettingRef` flag** suppresses `mergeCleanSet` during the reverse-scroll so words don't get re-cleaned as they briefly pass above the line going up. Cleared in the post-scroll timeout.
+  - **`introSeeds` memoized once** from the intro paragraph tokens — the canonical "what should stay clean across resets" set. Doesn't depend on DOM measurement, so the immediate-clear works before the scroll starts.
+
 ### 18:33 — Lab — experiment header restructure + reorder
 
 - Files: `components/lab/chroma-capture-section.tsx` (edited), `components/lab/typoglycemia-section.tsx` (edited), `app/lab/page.tsx` (edited).

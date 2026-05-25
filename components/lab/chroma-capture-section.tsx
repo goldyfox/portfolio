@@ -129,8 +129,7 @@ export function ChromaCaptureSection() {
           Chroma Capture
         </h2>
         <p className="mt-3 max-w-[56ch] font-serif text-[16px] leading-[1.6] italic text-[#fdfbf7]/70">
-          A color field, in motion. Move through it to nudge. Click to
-          pop. Tap the camera to save the moment.
+          Liquid color. Move it, pop it. Save the moments you make.
         </p>
 
         {/* Framed playfield */}

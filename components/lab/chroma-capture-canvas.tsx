@@ -48,7 +48,7 @@ import {
   makeBlobHues,
 } from "@/lib/chroma/color";
 import { type Vec2 } from "@/lib/chroma/physics";
-import { makeGrainPattern, renderFrame } from "@/lib/chroma/render";
+import { makeGrainPattern, renderFrame, renderFrameBaked } from "@/lib/chroma/render";
 import { getChromaAudio } from "@/lib/chroma/audio";
 
 const TARGET_BLOB_COUNT_DESKTOP = 24;
@@ -105,6 +105,27 @@ const PREROLL_STEP_MS = 50;
 /** Capture flash duration (ms). */
 const FLASH_DURATION_MS = 220;
 
+/**
+ * Detect Safari/WebKit. Used to gate two perf workarounds — DPR cap
+ * to 1 + canvas GPU compositing hints — because the live SVG filter
+ * chain (feGaussianBlur σ=10 + σ=25 + composite + threshold) is
+ * CPU-bound on WebKit but GPU-accelerated on Chrome/Firefox. Without
+ * these workarounds Safari can't hold 60fps on a retina canvas.
+ *
+ * UA-sniff is justified: the perf delta is browser-engine specific,
+ * there's no feature-detection signal for "slow filter compositor,"
+ * and the workarounds are zero-impact on non-Safari (they're spread
+ * conditionally — Chrome's style object is unchanged).
+ *
+ * Returns false during SSR (no navigator) so SSR and the client's
+ * first hydration render match; the Safari-specific path activates
+ * via a post-mount useEffect.
+ */
+function detectSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
 export interface ChromaCanvasHandle {
   /** Trigger a capture. Resolves true on a successful PNG download. */
   capture: () => Promise<boolean>;
@@ -159,6 +180,22 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
 
     const [, force] = useState(0);
 
+    // Safari-only perf gating. State is used in JSX (canvas style)
+    // and gates the CSS filter; tick reads the ref-mirrored value to
+    // avoid stale closure inside the rAF loop. Default false so SSR
+    // and the client's first hydration render match — the Safari
+    // path activates via the post-mount effect below.
+    const [isSafari, setIsSafari] = useState(false);
+    const isSafariRef = useRef(false);
+
+    // Offscreen stages used ONLY by the Safari bake path. Created and
+    // sized in applySize when detectSafari() returns true; left null
+    // on Chrome. See `renderFrameBaked` in render.ts for the pipeline.
+    const stage1Ref = useRef<HTMLCanvasElement | null>(null);
+    const stage2Ref = useRef<HTMLCanvasElement | null>(null);
+    const stage3Ref = useRef<HTMLCanvasElement | null>(null);
+    const stageDprRef = useRef<number>(1);
+
     // ----- DPR + resize ----------------------------------------------------
     /**
      * Resize the canvas backing store + CSS box and re-apply the DPR
@@ -178,7 +215,13 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
       const rect = container.getBoundingClientRect();
       const cssW = Math.max(1, Math.floor(rect.width));
       const cssH = Math.max(1, Math.floor(rect.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Safari: cap DPR at 1 (Chrome/Firefox: 2). On the CSS-filter
+      // path (Chrome) this halves the per-frame compositor work. On
+      // the JS-bake path (Safari) it halves backing-store size and
+      // therefore halves blur/pixel-pass cost. Either way it's pure
+      // perf with no perceptible visual cost (the goo blur dominates).
+      const safari = detectSafari();
+      const dpr = Math.min(window.devicePixelRatio || 1, safari ? 1 : 2);
       canvas.width = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
       canvas.style.width = `${cssW}px`;
@@ -192,21 +235,70 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
       targetBlobCountRef.current =
         cssW < MOBILE_BREAKPOINT ? TARGET_BLOB_COUNT_MOBILE : TARGET_BLOB_COUNT_DESKTOP;
 
+      // Safari-only: lazily create + size the offscreen stages that
+      // `renderFrameBaked` writes through. Stage 1 mirrors the visible
+      // canvas (same backing-store dims, ctx pre-scaled by DPR so
+      // drawBlob works in CSS px). Stages 2/3 use identity transforms
+      // because the blur/threshold/composite ops on them work in
+      // backing-store pixels.
+      if (safari) {
+        stageDprRef.current = dpr;
+        if (!stage1Ref.current) stage1Ref.current = document.createElement("canvas");
+        if (!stage2Ref.current) stage2Ref.current = document.createElement("canvas");
+        if (!stage3Ref.current) stage3Ref.current = document.createElement("canvas");
+        for (const stage of [stage1Ref.current, stage2Ref.current, stage3Ref.current]) {
+          stage.width = canvas.width;
+          stage.height = canvas.height;
+        }
+        const s1 = stage1Ref.current.getContext("2d");
+        if (s1) {
+          s1.setTransform(1, 0, 0, 1, 0, 0);
+          s1.scale(dpr, dpr);
+        }
+      }
+
       // Sync repaint with current state — eliminates the "blank frame"
       // gap between resize and next rAF tick. Guarded on having blobs
       // to skip the very first applySize() at mount, which runs before
-      // pre-roll populates the field.
+      // pre-roll populates the field. Branches to the Safari baked
+      // pipeline when applicable so the resize repaint matches the
+      // rAF tick's output (otherwise Safari would see un-merged solid
+      // blobs for a frame after every resize).
       if (ctx && blobsRef.current.length > 0) {
-        renderFrame(ctx, blobsRef.current, {
-          width: cssW,
-          height: cssH,
-          nowMs: performance.now(),
-          chord: chordRef.current,
-          includeGrain: false,
-          includeWatermark: false,
-          flashAlpha: 0,
-          grainPattern: grainPatternRef.current,
-        });
+        if (
+          safari &&
+          stage1Ref.current &&
+          stage2Ref.current &&
+          stage3Ref.current
+        ) {
+          renderFrameBaked(
+            ctx,
+            {
+              stage1: stage1Ref.current,
+              stage2: stage2Ref.current,
+              stage3: stage3Ref.current,
+            },
+            blobsRef.current,
+            {
+              width: cssW,
+              height: cssH,
+              nowMs: performance.now(),
+              dpr,
+              flashAlpha: 0,
+            },
+          );
+        } else {
+          renderFrame(ctx, blobsRef.current, {
+            width: cssW,
+            height: cssH,
+            nowMs: performance.now(),
+            chord: chordRef.current,
+            includeGrain: false,
+            includeWatermark: false,
+            flashAlpha: 0,
+            grainPattern: grainPatternRef.current,
+          });
+        }
       }
     }, []);
 
@@ -416,29 +508,70 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
           }
         }
 
-        // Render. The CSS goo filter on the canvas element (applied by
-        // the section wrapper via `style={{ filter: "url(#chroma-goo)" }}`)
-        // turns these solid ellipses into merged amorphous silhouettes —
-        // we just need to emit clean alpha shapes here.
-        renderFrame(ctx, blobsRef.current, {
-          width,
-          height,
-          nowMs,
-          chord: chordRef.current,
-          // v4.1: grain disabled. The grain pattern is fixed in canvas
-          // space, so it doesn't translate with the moving blobs — the
-          // texture reads as a screen filter rather than a property of
-          // the material. Toggle back to `true` if we want it.
-          includeGrain: false,
-          includeWatermark: false,
-          flashAlpha,
-          grainPattern: grainPatternRef.current,
-        });
+        // Render. Chrome uses the CSS goo filter on the canvas
+        // element (applied by the section wrapper via
+        // `style={{ filter: "url(#chroma-goo)" }}`) to merge the solid
+        // ellipses into amorphous silhouettes. Safari can't keep up
+        // with that filter chain at 60 fps, so when isSafariRef is
+        // true we route through the JS-baked pipeline that mirrors
+        // the SVG filter graph using canvas-native blur + pixel
+        // passes. The visual output is the same; only the compositor
+        // path differs.
+        if (
+          isSafariRef.current &&
+          stage1Ref.current &&
+          stage2Ref.current &&
+          stage3Ref.current
+        ) {
+          renderFrameBaked(
+            ctx,
+            {
+              stage1: stage1Ref.current,
+              stage2: stage2Ref.current,
+              stage3: stage3Ref.current,
+            },
+            blobsRef.current,
+            {
+              width,
+              height,
+              nowMs,
+              dpr: stageDprRef.current,
+              flashAlpha,
+            },
+          );
+        } else {
+          renderFrame(ctx, blobsRef.current, {
+            width,
+            height,
+            nowMs,
+            chord: chordRef.current,
+            // v4.1: grain disabled. The grain pattern is fixed in canvas
+            // space, so it doesn't translate with the moving blobs — the
+            // texture reads as a screen filter rather than a property of
+            // the material. Toggle back to `true` if we want it.
+            includeGrain: false,
+            includeWatermark: false,
+            flashAlpha,
+            grainPattern: grainPatternRef.current,
+          });
+        }
 
         rafIdRef.current = requestAnimationFrame(tick);
       },
       [spawnBlob],
     );
+
+    // ----- Safari detection (post-mount, avoids SSR/hydration mismatch) ----
+    // Sets the ref synchronously (consumed by tick) and the state for
+    // JSX. applySize is re-run when the ref flips so the offscreen
+    // stages get allocated immediately rather than waiting for the
+    // next resize event.
+    useEffect(() => {
+      if (!detectSafari()) return;
+      isSafariRef.current = true;
+      setIsSafari(true);
+      applySize();
+    }, [applySize]);
 
     // ----- Mount: size, grain, initial blobs, rAF, reduced-motion ----------
     useEffect(() => {
@@ -646,11 +779,18 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
             display: "block",
             width: "100%",
             height: "100%",
-            // CSS goo filter — soft-edge merging via SVG feGaussianBlur +
-            // feColorMatrix alpha threshold defined in the section wrapper.
-            // This is the canonical n3r4zzurr0 / Bret Cameron pattern;
-            // ctx.filter = "url()" is too unreliable across browsers.
-            filter: "url(#chroma-goo)",
+            // Chrome path: CSS goo filter — soft-edge merging via SVG
+            // feGaussianBlur + feColorMatrix alpha threshold defined
+            // in the section wrapper. The canonical n3r4zzurr0 /
+            // Bret Cameron pattern; ctx.filter = "url()" is too
+            // unreliable across browsers.
+            //
+            // Safari path: filter dropped entirely. The same goo
+            // pipeline is baked in JS via `renderFrameBaked` because
+            // WebKit's SVG filter compositor can't pipeline the
+            // compound graph at 60 fps. The visible canvas receives
+            // the already-baked image; no live filter needed.
+            filter: isSafari ? "none" : "url(#chroma-goo)",
             // `touch-action: none` lets drag-in-canvas be the nudge gesture
             // without the browser hijacking it for page scroll. Tap-to-pop
             // still works because pointerdown fires before any pan attempt.

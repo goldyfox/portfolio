@@ -278,3 +278,137 @@ export function renderFrame(
     ctx.restore();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Safari live-render pipeline (goo baked in JS, no CSS filter)
+// ---------------------------------------------------------------------------
+
+/**
+ * Constants for the live JS bake pipeline. Mirror the SVG filter +
+ * `captureToPng` constants exactly so Safari output matches Chrome's
+ * CSS-filter output frame-for-frame (modulo DPR differences).
+ */
+const BAKED_GOO_SILHOUETTE_BLUR_PX = 10;
+const BAKED_GOO_COLOR_BLUR_PX = 25;
+const BAKED_GOO_ALPHA_MULT = 30;
+const BAKED_GOO_ALPHA_OFFSET_255 = 11.7 * 255;
+const BAKED_ALPHA_BOOST = 1.15;
+
+export interface RenderBakedStages {
+  /** Solid-blob render target. Its context must be pre-scaled by DPR. */
+  stage1: HTMLCanvasElement;
+  /** Silhouette canvas (blur σ=10 + alpha threshold). Identity transform. */
+  stage2: HTMLCanvasElement;
+  /** Soft color canvas (blur σ=25 of stage1). Identity transform. */
+  stage3: HTMLCanvasElement;
+}
+
+export interface RenderBakedOptions {
+  width: number;
+  height: number;
+  nowMs: number;
+  /** Device pixel ratio used for stage backing stores. Blur radii scale with this. */
+  dpr: number;
+  flashAlpha?: number;
+}
+
+/**
+ * Live render path used on Safari where the live CSS `filter: url(#chroma-goo)`
+ * compositor is CPU-bound and can't hold 60 fps. This function bakes the
+ * exact same filter chain in JS using canvas-native blur + pixel passes,
+ * which Safari's canvas pipeline DOES GPU-accelerate (the slow part on
+ * Safari is the compound SVG-filter graph, not the individual primitives).
+ *
+ * Pipeline mirrors `captureToPng` in `capture.ts`:
+ *
+ *   1. Render solid blobs to `stage1` (DPR-scaled context).
+ *   2. Blur `stage1` σ=10 → `stage2`; pixel-pass threshold its alpha
+ *      so it becomes a crisp silhouette mask.
+ *   3. Blur `stage1` σ=25 → `stage3` (soft color cloud).
+ *   4. On the VISIBLE canvas (identity transform): clear, draw `stage3`,
+ *      `destination-in` `stage2` to mask the soft color to the silhouette,
+ *      pixel-pass alpha boost ×1.15, then re-apply the DPR transform and
+ *      paint the capture flash if active.
+ *
+ * Why this works on Safari when the CSS path doesn't: Safari's canvas
+ * blur is fast (single GPU op). The SVG filter chain stutters because it
+ * stages multiple filter primitives through render-target swaps that
+ * Safari's filter compositor doesn't pipeline efficiently. Splitting the
+ * chain into discrete canvas operations gives Safari one fast op at a
+ * time instead of one slow graph.
+ *
+ * Chrome users never hit this path — they keep the CSS filter, which
+ * Chrome's compositor GPU-accelerates natively.
+ */
+export function renderFrameBaked(
+  visibleCtx: CanvasRenderingContext2D,
+  stages: RenderBakedStages,
+  blobs: Blob[],
+  opts: RenderBakedOptions,
+): void {
+  const { width, height, nowMs, dpr, flashAlpha = 0 } = opts;
+  const { stage1, stage2, stage3 } = stages;
+
+  // -- Stage 1: solid blobs to stage1 (CSS-pixel coords, pre-scaled ctx)
+  const c1 = stage1.getContext("2d");
+  if (!c1) return;
+  c1.clearRect(0, 0, width, height);
+  for (const b of blobs) {
+    drawBlob(c1, b, nowMs);
+  }
+
+  // -- Stage 2: silhouette pipeline — blur σ=10 + alpha threshold
+  // stage2's context is identity; blur radius is in backing-store px,
+  // so we scale by DPR (matches `captureToPng`).
+  const c2 = stage2.getContext("2d");
+  if (!c2) return;
+  c2.clearRect(0, 0, stage2.width, stage2.height);
+  c2.filter = `blur(${BAKED_GOO_SILHOUETTE_BLUR_PX * dpr}px)`;
+  c2.drawImage(stage1, 0, 0);
+  c2.filter = "none";
+  const img2 = c2.getImageData(0, 0, stage2.width, stage2.height);
+  const data2 = img2.data;
+  for (let i = 3; i < data2.length; i += 4) {
+    const a = data2[i];
+    const t = a * BAKED_GOO_ALPHA_MULT - BAKED_GOO_ALPHA_OFFSET_255;
+    data2[i] = t < 0 ? 0 : t > 255 ? 255 : t;
+  }
+  c2.putImageData(img2, 0, 0);
+
+  // -- Stage 3: soft color pipeline — blur σ=25 of stage1
+  const c3 = stage3.getContext("2d");
+  if (!c3) return;
+  c3.clearRect(0, 0, stage3.width, stage3.height);
+  c3.filter = `blur(${BAKED_GOO_COLOR_BLUR_PX * dpr}px)`;
+  c3.drawImage(stage1, 0, 0);
+  c3.filter = "none";
+
+  // -- Compose onto visible canvas. Save current DPR transform first.
+  visibleCtx.save();
+  visibleCtx.setTransform(1, 0, 0, 1, 0, 0);
+  visibleCtx.clearRect(0, 0, stage3.width, stage3.height);
+  visibleCtx.drawImage(stage3, 0, 0);
+  visibleCtx.globalCompositeOperation = "destination-in";
+  visibleCtx.drawImage(stage2, 0, 0);
+  visibleCtx.globalCompositeOperation = "source-over";
+
+  // -- Alpha boost (pixel pass over visible canvas backing store)
+  const outImg = visibleCtx.getImageData(0, 0, stage3.width, stage3.height);
+  const outData = outImg.data;
+  for (let i = 3; i < outData.length; i += 4) {
+    const boosted = outData[i] * BAKED_ALPHA_BOOST;
+    outData[i] = boosted > 255 ? 255 : boosted;
+  }
+  visibleCtx.putImageData(outImg, 0, 0);
+  visibleCtx.restore();
+
+  // -- Capture flash overlay (live only). visibleCtx is back to its
+  //    DPR-scaled transform here thanks to restore(), so we work in
+  //    CSS pixels for parity with the non-baked path.
+  if (flashAlpha > 0.001) {
+    visibleCtx.save();
+    visibleCtx.fillStyle = `rgba(253, 251, 247, ${Math.min(1, flashAlpha)})`;
+    visibleCtx.fillRect(0, 0, width, height);
+    visibleCtx.restore();
+  }
+}

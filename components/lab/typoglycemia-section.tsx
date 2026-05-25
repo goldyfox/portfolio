@@ -71,6 +71,11 @@ export function TypoglycemiaSection() {
   // contentY of each word (vertical center, in the box's scroll-content
   // coordinate space — i.e. independent of scrollTop).
   const wordYRef = useRef<Map<number, number>>(new Map());
+  // True while the reset-to-top animation is running. Suppresses the
+  // rAF-throttled scroll handler from re-cleaning words as they cross
+  // the line during the reverse scroll. Cleared in the timeout that
+  // closes out the reset.
+  const isResettingRef = useRef(false);
 
   // Tokenize once. Assign a stable seed to every word token across all
   // essay paragraphs so the clean-set can refer to words by seed.
@@ -99,6 +104,19 @@ export function TypoglycemiaSection() {
   }, []);
 
   const [introParagraph, ...bodyParagraphs] = paragraphs;
+
+  // Seeds of every word in the intro paragraph. The intro is always
+  // above the line by construction, so these are the words that stay
+  // clean after a reset (everything else re-scrambles).
+  const introSeeds = useMemo<Set<number>>(() => {
+    const seeds = new Set<number>();
+    if (introParagraph && introParagraph.kind === "essay") {
+      for (const t of introParagraph.tokens) {
+        if (t.seed !== null) seeds.add(t.seed);
+      }
+    }
+    return seeds;
+  }, [introParagraph]);
 
   // ---- Reduced motion ------------------------------------------------------
   useEffect(() => {
@@ -156,6 +174,12 @@ export function TypoglycemiaSection() {
   }, [demarcationContentY]);
 
   const mergeCleanSet = useCallback((incoming: Set<number>) => {
+    // During a reset, the smooth reverse-scroll causes the scroll
+    // handler to fire on every frame. Without this guard, words that
+    // briefly satisfy "above the line" during reverse scroll would
+    // get re-merged into the clean set immediately after we just
+    // cleared them.
+    if (isResettingRef.current) return;
     setCleanWords((prev) => {
       let changed = false;
       const next = new Set(prev);
@@ -175,6 +199,34 @@ export function TypoglycemiaSection() {
     const dist = box.scrollHeight - box.scrollTop - box.clientHeight;
     setIsAtBottom(dist < 24);
   }, []);
+
+  /**
+   * Reset the experiment: re-scramble every body word and smooth-scroll
+   * back to the top. Intro words stay clean throughout (they're above
+   * the line by construction). The `isResettingRef` flag suppresses
+   * the scroll handler's merge during the reverse-scroll so words
+   * don't get re-cleaned as they pass above the line going up.
+   */
+  const resetEssay = useCallback(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    isResettingRef.current = true;
+    // Body words re-scramble immediately; intro stays clean.
+    setCleanWords(new Set(introSeeds));
+    box.scrollTo({ top: 0, behavior: "smooth" });
+    // Resolve the smooth scroll, then re-measure and replace the clean
+    // set with whatever's above the line at scroll=0 (i.e. intro only).
+    // The 700 ms timeout covers Chrome's default smooth-scroll duration
+    // for our typical reverse distance (~600–1300 px). If a slower
+    // engine takes longer, the worst case is a brief delay before the
+    // clean set re-syncs — not a functional bug.
+    window.setTimeout(() => {
+      measureWordPositions();
+      setCleanWords(computeCrossings());
+      updateBottomFade();
+      isResettingRef.current = false;
+    }, 700);
+  }, [introSeeds, measureWordPositions, computeCrossings, updateBottomFade]);
 
   // ---- Initial measurement (waits for fonts) -------------------------------
   useLayoutEffect(() => {
@@ -282,7 +334,8 @@ export function TypoglycemiaSection() {
           Typoglycemia
         </h2>
         <p className="mt-3 max-w-[56ch] font-serif text-[16px] leading-[1.6] italic text-[#fdfbf7]/70">
-          An essay you decode by scrolling.
+          Scrambled letters your brain reads anyway. Scroll to watch
+          them resolve.
         </p>
 
         {/* Bounded experiment box */}
@@ -368,6 +421,30 @@ export function TypoglycemiaSection() {
                   {typoglycemiaEssay.attribution.linkLabel}
                 </a>
               </p>
+
+              {/*
+                Scroll runway + reset CTA. The blue line pins at
+                top: 120 px inside the box; for the LAST essay word to
+                reach the line at max scroll, we need (clientHeight − 120)
+                px of content below it — that's ~600 px at the box's
+                max height of 720 px. This 540 px block plus the
+                preceding hr+attribution (~89 px) and the wrapper's
+                bottom py-8 (32 px) totals ~660 px below the last
+                essay word, comfortably above the bar.
+                The reset button sits vertically centered in the block,
+                so it appears as a natural midpoint between attribution
+                and the bottom of the box.
+              */}
+              <div className="flex h-[540px] items-center justify-center">
+                <button
+                  type="button"
+                  onClick={resetEssay}
+                  className="inline-flex items-center gap-2 font-sans text-[13px] font-semibold text-white transition-colors hover:text-[#1313ec] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#1313ec] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0b0b12]"
+                >
+                  <IconRefresh />
+                  Reset experiment
+                </button>
+              </div>
             </div>
           </div>
 
@@ -384,5 +461,50 @@ export function TypoglycemiaSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icons
+// ---------------------------------------------------------------------------
+
+function IconRefresh() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M13.5 3.5v3.2H10.3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.5 12.5v-3.2h3.2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.8 6.5a4.6 4.6 0 0 1 8.2-.9l1.5 1.1"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12.2 9.5a4.6 4.6 0 0 1-8.2.9L2.5 9.3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

@@ -6,6 +6,14 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 20:00 — Chroma Capture v4.10 — density 24 → 30
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited), `docs/DECISIONS.md` (edited — added v4.10 entry above v4.9).
+- What: `TARGET_BLOB_COUNT_DESKTOP` 24 → 30 (+25%). Lisa testing the upper end of v4.8's documented range now that v4.9 broke up the lateral clumping that was the prior ceiling. Math: at N=30 each blob has ~10 σ-neighbors → accumulated entrainment coefficient 10·0.008·0.4 ≈ 0.032 (was 0.026 at N=24). Still well under cursor scale 0.1 — "whisper" level preserved.
+- Decisions:
+  - **Density is the user-facing lever; entrainment is internal.** If clumping returns, drop `blobEntrainScale` 0.008 → 0.006 rather than rolling density back. Reflected in the v4.10 fallback path.
+  - **O(n²) entrainment perf at N=30**: 900 pair checks/tick (was 576). Inside frame budget; existing distance gate covers the rest.
+
 ### 19:55 — DECISIONS.md sweep — lift session-level work to architecture-level
 
 - Files: `docs/DECISIONS.md` (edited).

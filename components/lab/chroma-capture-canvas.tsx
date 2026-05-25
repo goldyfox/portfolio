@@ -51,7 +51,7 @@ import { type Vec2 } from "@/lib/chroma/physics";
 import { makeGrainPattern, renderFrame, renderFrameBaked } from "@/lib/chroma/render";
 import { getChromaAudio } from "@/lib/chroma/audio";
 
-const TARGET_BLOB_COUNT_DESKTOP = 24;
+const TARGET_BLOB_COUNT_DESKTOP = 30;
 const TARGET_BLOB_COUNT_MOBILE = 10;
 /** Mobile breakpoint (px). Mirrors the rest of the portfolio. */
 const MOBILE_BREAKPOINT = 640;

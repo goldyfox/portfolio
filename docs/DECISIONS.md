@@ -378,6 +378,20 @@ All motion derives from first principles:
 
 **Files**: `lib/chroma/render.ts` (added `renderFrameBaked`), `components/lab/chroma-capture-canvas.tsx` (added detection, stage refs, conditional render branch in tick, conditional filter in style).
 
+### Physics (v4.10 — density 24 → 30)
+
+Empirical test of the upper end of the v4.8 range. `TARGET_BLOB_COUNT_DESKTOP` bumped 24 → 30 (+25%) on Lisa's call after v4.9 broke up the lateral clumping that was the main risk of higher density.
+
+**Tunable lever**: `TARGET_BLOB_COUNT_DESKTOP` in `components/lab/chroma-capture-canvas.tsx`. Currently **30**; range 18 (original) ↔ 24 (v4.8) ↔ 30 (current) ↔ 32 (documented upper bound — risks feeling cramped).
+
+**Math implication** (extending v4.9's sanity check): at N=30 each blob has ~10 simultaneous neighbors within σ=130px (was ~8 at N=24). Accumulated entrainment impulse coefficient: 10·0.008·0.4 ≈ **0.032** (was 0.026 at N=24). Still well under `cursorImpulseScale=0.1`, so the "whisper-level" coupling intended by v4.9 is preserved — slightly louder, but order-of-magnitude unchanged.
+
+**Perf consideration**: O(n²) pairwise entrainment at N=30 = 900 pair checks/tick (was 576 at N=24, +56%). Still inside frame budget on modern hardware; existing distance gate in `applyBlobEntrainment` already skips most pairs. If FPS dips, the gate threshold is the lever before density drops back.
+
+**Fallback path**: if clumping returns despite v4.9 → drop `blobEntrainScale` 0.008 → 0.006 (rather than rolling density back to 24). The density is the user-facing improvement; entrainment is the internal tuning lever.
+
+**Mobile held**: `TARGET_BLOB_COUNT_MOBILE = 10` unchanged.
+
 ### Physics (v4.9 — entrainment halved, anti-clumping pass)
 
 After v4.8 (24 blobs), lateral clustering became dominant: 5–6-blob clumps would form and large canvas regions would sit empty. Diagnosis: pairwise blob-blob entrainment at scale 0.015 was tuned as a "whisper" per pair, but with N=24 each blob is within σ=130px of up to ~8 neighbors simultaneously. The accumulated impulse defeated the math-claimed 2:1 vertical:horizontal RMS ratio. Halved `blobEntrainScale` from 0.015 → 0.008.

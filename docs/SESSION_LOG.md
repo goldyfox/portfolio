@@ -6,6 +6,19 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 19:55 — DECISIONS.md sweep — lift session-level work to architecture-level
+
+- Files: `docs/DECISIONS.md` (edited).
+- What: Cross-check pass found four gaps where today's work needed to be lifted from session log to architectural record so the next agent doesn't have to spelunk:
+  1. **Slot labels updated** across 8 references in 5 sections (Lab page intro, framed-work-model bullets, Typoglycemia header copy, Typoglycemia border note, Lab page integration list, Chroma Capture section heading). Chroma is now slot 01, Typoglycemia is slot 02 everywhere.
+  2. **New section: "Lab experiment header — 3-tier pattern"** under Lab page. Codifies the eyebrow/title/subtitle structure (Inter 11px uppercase / Newsreader clamp h2 / Newsreader 16px italic 70%) so future Lab experiments inherit it by reference, not by re-deriving the rationale.
+  3. **New section: "Reset CTA + scroll runway math"** under Typoglycemia. Documents the 540 px vertically-centered block that double-purposes as the unscramble runway, the immediate-rescramble-then-smooth-scroll reset behavior, and `isResettingRef` flag.
+  4. **New section: "Rendering (Safari — JS-baked goo, CSS filter dropped)"** under Chroma Capture (inserted above v4.9 — newest-on-top). Permanent cross-browser rendering split: CSS filter on Chrome/Firefox, JS-baked three-stage canvas pipeline on Safari. Includes the matching-pipeline decisions, the two-layer detection pattern, DPR=1 cap, and the visual tradeoff acknowledgement.
+- Decisions:
+  - **Newest-on-top ordering for Chroma Capture's render section family.** Inserted the Safari entry above the v4.x entries to match the existing chronology pattern in that section.
+  - **No git rewrite of the `slot 02` history.** The previous slot numbers were correct at the time they were written; updating them in place rather than appending a "renamed" note keeps DECISIONS scannable as a current-state doc instead of a changelog.
+  - **Cross-reference, not duplicate.** Typoglycemia's "Section header" bullet now links to the 3-tier Lab pattern instead of restating it.
+
 ### 19:42 — Session close — unlogged copy + style tweaks
 
 Catching trailing iterations that fell below per-entry logging threshold:

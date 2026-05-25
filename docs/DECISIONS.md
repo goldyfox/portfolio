@@ -73,14 +73,26 @@ Captures key choices, preferences, and rationale from the initial build session.
 ## Lab page (full-dark Vault) & Journey Explorer placement
 
 - **`/lab` uses the darker Vault / screen10 direction** as a **full-page dark experience — including header and footer chrome.** This is not just dark `<main>`; the entire viewport gets the Vault treatment via `app/lab/layout.tsx` wrapping content in `.vault-theme`, which triggers CSS `:has()` rules in `globals.css` to override body/header/footer colors. Azure Halo hidden. No arbitrary new colors — ethos blue remains the accent.
-- **Journey Explorer** (interactive dashboard) lives on its **dedicated project page** at `/catalog/journey-explorer` — **not** on `/` or `/lab`. The Brief page shows a condensed preview with a CTA ("Explore the interactive prototype →") linking to the full case study with the live JE embed. On mobile, JE renders as a **descriptive text fallback** (R17). Lab is for **1–3 mini interactive experiments** — concepts include Typoglycemia (shipped, slot 01) and Chroma Capture (shipped, slot 02); future slots TBD (brainstorm with Lisa). **AVA was removed from Lab** because it has been promoted to a full case study; Lab is now reserved for craft demos that don't fit the case-study format.
+- **Journey Explorer** (interactive dashboard) lives on its **dedicated project page** at `/catalog/journey-explorer` — **not** on `/` or `/lab`. The Brief page shows a condensed preview with a CTA ("Explore the interactive prototype →") linking to the full case study with the live JE embed. On mobile, JE renders as a **descriptive text fallback** (R17). Lab is for **1–3 mini interactive experiments** — concepts include Chroma Capture (shipped, slot 01) and Typoglycemia (shipped, slot 02); future slots TBD (brainstorm with Lisa). **AVA was removed from Lab** because it has been promoted to a full case study; Lab is now reserved for craft demos that don't fit the case-study format.
 
 ### Lab experiment interior palette — framed-work model
 
 - Lab is **dark Vault on the outside (gallery floor); each experiment is its own framed work hanging on the wall**, free to set its own interior palette when the work demands it.
-- **Typoglycemia (slot 01)** runs dark interior (cream text on Vault dark) — the work is reading, the dark monitor framing is right.
-- **Chroma Capture (slot 02)** runs **cream interior with a hairline ethos-blue frame** (`bg-[#fdfbf7]`, `border-[#1313ec]/40`). The vibrancy of generative gradient color requires a cream substrate — the same colors on a dark substrate read as neon/fluorescent, a different aesthetic. The hairline blue border treats the box as an explicit framed artwork, not as a chunk of inconsistent UI.
+- **Chroma Capture (slot 01)** runs **cream interior with a hairline ethos-blue frame** (`bg-[#fdfbf7]`, `border-[#1313ec]/40`). The vibrancy of generative gradient color requires a cream substrate — the same colors on a dark substrate read as neon/fluorescent, a different aesthetic. The hairline blue border treats the box as an explicit framed artwork, not as a chunk of inconsistent UI.
+- **Typoglycemia (slot 02)** runs dark interior (cream text on Vault dark) — the work is reading, the dark monitor framing is right.
 - **Permitted pattern for future experiments:** each Lab slot may choose its own interior palette if the work requires it. The Lab page-level Vault treatment (header, footer, page chrome) is non-negotiable; interior boxes are.
+
+### Lab experiment header — 3-tier pattern
+
+Every Lab experiment uses the same three-tier header structure above its bounded box. Established by the Session 23 restructure (2026-05-24).
+
+1. **Eyebrow** — `<p>` in Inter, 11px, uppercase, tracked, full-strength cream. Format: `"NN — Experiment"` (e.g. `"01 — Experiment"`). Generic label, not the experiment name. `<p>`, not `<h?>`: a numbered slot label alone isn't semantically a heading.
+2. **Title** — `<h2>` in Newsreader, `clamp(1.25rem, 2.5vw, 1.75rem)`, leading 1.2, full-strength cream, **not italic**. The experiment's proper name (Chroma Capture, Typoglycemia). Semantic page outline: page `<h1>` = "Lab", section `<h2>` = experiment name.
+3. **Subtitle** — `<p>` in Newsreader, **16px**, line-height 1.6, italic, cream at 70%, max-width 56ch. Descriptive lede / hint at interaction, visually subordinate to both the 18px page intro at the top of `/lab` and the title above it. Italic distinguishes it from page-intro prose.
+
+**Why title is non-italic** — proper nouns shouldn't lean.
+**Why subtitle is italic and smaller** — needs to read as descriptive copy, not a second title; italic gives it textural difference from the page intro at the top of `/lab`.
+**Rejected** — the earlier two-tier "huge italic title slot + tiny eyebrow" pattern. Read as a subtitle dressed up as the main heading; semantic and visual hierarchy were both off.
 
 ## Project pages
 
@@ -245,7 +257,7 @@ Quote paragraphs do not participate in the unscramble experience. The visual blo
 
 ### Display copy decisions
 
-- **Section header:** Inter 11px uppercase tracked — "01 — Typoglycemia" — matching the Lab section header pattern (`01 — name`, see also the reserved slot 02 placeholder).
+- **Section header:** uses the [3-tier Lab experiment header pattern](#lab-experiment-header--3-tier-pattern). Eyebrow `"02 — Experiment"`, title `<h2>` `Typoglycemia`, subtitle "Scrambled letters your brain reads anyway. Scroll to watch them resolve."
 - **Tagline:** "An essay you decode by scrolling." (Newsreader, italic, `clamp(1.25rem, 2.5vw, 1.75rem)`) — sits between the header and the bounded box.
 - **Demarcation:** 1px ethos-blue line, the only fixed-in-place element inside the box. Implemented as a `position: sticky; top: 120px` element in flow between the intro and body. 120px viewport offset gives ~4 lines of clean accumulation area above the line once the user has scrolled past the intro. Not the `.blue-hairline` class — the Vault theme overrides that class to cream-tint, and we need ethos-blue.
 - **Body type:** Newsreader `clamp(15px, 1.5vw, 17px)`, line-height 1.6, cream on Vault dark. Smaller than a standalone reading page because the box is bounded.
@@ -255,7 +267,7 @@ Quote paragraphs do not participate in the unscramble experience. The visual blo
 
 - **Height:** `h-[min(75vh,720px)] min-h-[420px]` — caps at 720px on tall screens, scales down to 75vh on shorter viewports, never collapses below 420px.
 - **Width:** full-width of the Lab section column. Inner reading column is `max-w-[640px]` centered, so the line length stays readable regardless of viewport.
-- **Border + bg:** 1px cream-at-10% border, cream-at-3% background — same chrome as the reserved slot 02 placeholder so the experiment reads as a sibling artifact in a consistent Lab grid.
+- **Border + bg:** 1px cream-at-10% border, cream-at-3% background — matches the chrome of Chroma Capture's frame so the two experiments read as sibling artifacts in a consistent Lab grid.
 - **Sticky region background:** N/A in current architecture (the line is a 1px element, not a panel). The bottom fade overlay uses `rgb(18, 18, 25)` — the visual equivalent of the box's 3% cream-over-Vault-dark.
 - **Scrollbar:** styled thin scrollbar via `.typo-box` rules in `globals.css` (`scrollbar-width: thin`, custom `-webkit-scrollbar` thumb at 18% cream). Visible always — an explicit "this is scrollable" affordance.
 - **Bottom fade:** 64px gradient from `rgb(18,18,25)` to transparent overlaying the box's bottom edge. Fades to `opacity: 0` (300ms) once the user reaches the bottom so the attribution paragraph is fully legible.
@@ -271,16 +283,29 @@ Quote paragraphs do not participate in the unscramble experience. The visual blo
 - **Demarcation Y is read live each frame.** Instead of reasoning about whether the line is in natural flow or stuck, the scroll handler calls `lineRef.current.getBoundingClientRect()` and converts to content-Y. Same code path regardless of stuck state — fewer branches, no off-by-one at the moment of engagement.
 - **Tests via `vitest`.** Added as a `devDependency` with a `test` script; the scrambler's correctness is the entire premise of the experiment, so its invariants must be enforceable, not just documented.
 
+### Reset CTA + scroll runway math
+
+After the unscramble experience completes, a **"Reset experiment"** button lets the reader replay. Added in Session 23 (2026-05-24).
+
+- **Math: the bug it also fixed.** For a word's vertical center to cross the demarcation line at `top: 120px`, the word must be able to scroll up to that position — which requires the runway below the word to be at least `clientHeight − 120px` ≈ **600px** at full box height (720px). The pre-reset state had only ~120px (hr + attribution + box padding), so the last 1–2 essay paragraphs could never unscramble. Adding the reset CTA inside a **540px vertically-centered block** below the attribution doubled as the missing runway and a natural "end of experience" anchor.
+- **Style.** `font-sans` 13px, `font-semibold`, full-strength white (not the /60 muted cream used elsewhere — the CTA is the only fully active control at the bottom). Refresh icon, stroke 1.7 to match the heavier text weight. Hover ethos-blue. Centered horizontally and vertically inside the 540px block.
+- **Reset behavior.**
+  - Smooth-scrolls the box to top.
+  - **Immediately re-scrambles body words** (replaces `cleanWords` with `introSeeds` — the canonical "intro paragraph stays clean" set, memoized once at mount). Instant visual confirmation that reset fired. The smooth scroll then animates through already-scrambled body text.
+  - **`isResettingRef` flag** suppresses the rAF scroll handler's `mergeCleanSet` calls during the reverse scroll so words don't get re-cleaned as they briefly pass above the line going up. Cleared in the post-scroll `setTimeout` (700ms).
+  - Re-measures word positions and re-runs `computeCrossings` after settle — synchronizes state with where words actually ended up.
+- **Why not a smaller block + dead space below.** A 540px block looks like dead space; positioning the CTA at the bottom would still need the same total height to satisfy the math. Centering inside the block makes the CTA feel anchored to the end of the experience rather than tacked on.
+
 ### Lab page integration
 
-- `/lab` slot 01 renders `<TypoglycemiaSection />` (from `components/lab/typoglycemia-section.tsx`) directly — no preview card, no link, the experiment IS the slot content.
-- `/lab` slot 02 renders `<ChromaCaptureSection />` (see below).
+- `/lab` slot 01 renders `<ChromaCaptureSection />` (from `components/lab/chroma-capture-section.tsx`) directly — no preview card, no link, the experiment IS the slot content. Chroma is first because it's the visually stronger pull — a moving color field reads as "interactive demo" at a glance and gets visitors engaged before they read.
+- `/lab` slot 02 renders `<TypoglycemiaSection />`.
 - AVA was removed from Lab (it has been promoted to a full case study and no longer fits the Lab format).
 - The `/lab/typoglycemia` subroute is deleted. Any future inbound links to that URL should redirect to `/lab#typoglycemia`.
 
 ---
 
-## Chroma Capture (Lab experiment, slot 02)
+## Chroma Capture (Lab experiment, slot 01)
 
 Second Lab experiment. A kinetic color-harmony field: soft gradient blobs drift upward, respond to cursor motion, can be popped (which plays a chord), and can be saved as a no-background PNG. Lives **inline** on `/lab` as a bounded playfield — same architectural pattern as Typoglycemia.
 
@@ -324,6 +349,34 @@ All motion derives from first principles:
 - **Polyphony cap: 8 voices.** Rapid pop-spamming steals oldest voices.
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
+
+### Rendering (Safari — JS-baked goo, CSS filter dropped)
+
+**Permanent cross-browser rendering split.** Added in Session 23 (2026-05-24) after Safari users reported visible stutter on the live canvas.
+
+**Diagnosis.** The CSS `filter: url(#chroma-goo)` chain (σ=10 + σ=25 blur + threshold + composite + alpha boost) is GPU-accelerated and pipelined on Chrome/Firefox but **CPU-bound on WebKit**. At DPR=2 on retina (~3M backing-store pixels per frame) Safari can't hold 60fps on the compound SVG filter. Two cheap mitigations (Pass 1: DPR cap to 1 on Safari; Pass 2: `will-change: filter` + `translate3d(0,0,0)` GPU hints) didn't move the needle — the filter compositor was the bottleneck, not the layer promotion or pixel count.
+
+**Resolution: bake the goo in JS on Safari only.**
+
+- **Chrome/Firefox (unchanged):** canvas paints solid blobs → CSS `filter: url(#chroma-goo)` on the canvas element does blur + threshold + composite + boost. Bit-for-bit identical to the pre-pass code path.
+- **Safari:** CSS filter dropped from the canvas style (`filter: isSafari ? "none" : "url(#chroma-goo)"`). New `renderFrameBaked` function in `lib/chroma/render.ts` mirrors the SVG filter chain using three offscreen canvases:
+  - **stage1** — solid blobs drawn at full DPR.
+  - **stage2** — σ=10 canvas-native blur of stage1 → walk ImageData and apply the threshold formula (`a' = clamp(a·30 − 11.7·255, 0, 255)`) to produce the crisp silhouette.
+  - **stage3** — σ=25 canvas-native blur of stage1 → soft color cloud.
+  - Compose: stage3 RGB masked by stage2 alpha (Porter-Duff `destination-in`-equivalent), then ALPHA_BOOST ×1.15 pass.
+  - Result: same blur radii, same threshold cut point, same alpha boost as the SVG path. Safari handles each step as a discrete canvas operation it CAN GPU-accelerate.
+- **Detection.** `detectSafari()` UA-sniff (Safari and not Chrome/Android). Two-layer pattern: `isSafariRef` for the tick loop (no stale closure); `isSafari` state for JSX (set in a post-mount `useEffect` so SSR and first client render both see `false`, then re-render with Safari path — avoids hydration mismatch). The detection effect is declared *before* the mount effect so the ref is populated before the first tick.
+- **DPR cap (kept from Pass 1).** Safari renders at `dpr = 1` (Chrome stays at `min(devicePixelRatio, 2)`). Halves backing-store pixel count; goo blurs everything anyway so crispness loss is imperceptible in motion.
+- **Stage canvases cached on refs** (`stage1Ref`, `stage2Ref`, `stage3Ref`), created and sized inside `applySize` on Safari only. ResizeObserver-driven resizes recreate stage sizing. Chrome path doesn't allocate them at all.
+
+**Decisions made along the way.**
+
+- **Match Chrome's pipeline exactly, including the ALPHA_BOOST step.** Skipping it would save one pixel pass (~3 ms) but Safari output would read more pastel than Chrome — divergent visuals across browsers is a worse outcome than a tighter Safari frame budget.
+- **One bake function in `render.ts`, not factored shared with `captureToPng`.** The capture path runs once per click; refactoring for ~30 lines of overlap isn't worth the abstraction cost. They can converge later if a third caller appears.
+- **GPU hints removed** (Pass 1 leftover). With the CSS filter gone on Safari there's no live filter for `will-change: filter` to optimize.
+- **Visual tradeoff accepted.** Safari output is slightly less crisp than Chrome (DPR=1 + canvas-native blur approximations vs feGaussianBlur). Lisa: "Honestly if they don't use chrome I prob don't want to work there lol." The tradeoff is acceptable as long as the experiment is smooth, which it now is.
+
+**Files**: `lib/chroma/render.ts` (added `renderFrameBaked`), `components/lab/chroma-capture-canvas.tsx` (added detection, stage refs, conditional render branch in tick, conditional filter in style).
 
 ### Physics (v4.9 — entrainment halved, anti-clumping pass)
 

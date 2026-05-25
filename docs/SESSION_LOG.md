@@ -6,6 +6,15 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 20:14 — Chroma Capture v4.12 — density 24 → 30 (with cadence this time)
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited — target 24 → 30, cadence 3000 → 2400 ms, jitter 1000 → 800 ms), `docs/DECISIONS.md` (edited — added v4.12 entry above v4.11).
+- What: Re-applying v4.10's intent (more blobs) now that v4.11 surfaced the actual lever. New equilibrium: 72 s / 2.4 s = **30 blobs sustained**. Pre-roll fills to cap at first paint (no ramp-up visible).
+- Decisions:
+  - **Three-knob change applied together** — target, base cadence, jitter — to keep variance ratio at the v4.11-calibrated 33 % of base. Treating them as a coupled set, not independent levers.
+  - **Pre-roll is now over-provisioned** (90 s × 1/2.4 s = ~37 possible spawns vs target 30). Field will hit the cap during pre-roll instead of after, which is the cleaner first-paint behavior.
+  - **Entrainment math holds**: at N=30 with blobEntrainScale=0.008, accumulated coefficient ≈ 0.032, still well under cursor scale 0.1. v4.9 tuning preserved.
+
 ### 20:11 — Chroma Capture v4.11 — cadence calibration (the density-target bug)
 
 - Files: `components/lab/chroma-capture-canvas.tsx` (edited — target back to 24, cadence 3500 → 3000), `docs/DECISIONS.md` (edited — added v4.11 entry above v4.10, marked v4.10 SUPERSEDED).

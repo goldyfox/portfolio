@@ -378,6 +378,23 @@ All motion derives from first principles:
 
 **Files**: `lib/chroma/render.ts` (added `renderFrameBaked`), `components/lab/chroma-capture-canvas.tsx` (added detection, stage refs, conditional render branch in tick, conditional filter in style).
 
+### Physics (v4.12 — density 24 → 30, with the calibration applied this time)
+
+Same goal as v4.10 (more blobs visible) — this time with the v4.11 cadence-equilibrium math applied so the change actually lands. `TARGET_BLOB_COUNT_DESKTOP` 24 → 30 paired with `STEADY_CADENCE_BASE_MS` 3000 → 2400 ms. Jitter dropped 1000 → 800 ms to preserve the v4.11 variance ratio (33 % of base).
+
+**Math**: `N_eq = traversal / cadence = 72 s / 2.4 s = 30`. Field genuinely sustains at 30 in steady state, not just at the pre-roll peak.
+
+**Pre-roll behavior**: at 90 s of virtual time with 2.4 s cadence, pre-roll can spawn ~37 blobs — well over target. Field is fully populated (capped at 30) by first paint, no ramp-up visible to the user.
+
+**Tunable levers updated**:
+- `TARGET_BLOB_COUNT_DESKTOP`: 30 (was 24).
+- `STEADY_CADENCE_BASE_MS`: 2400 (was 3000).
+- `STEADY_CADENCE_JITTER_MS`: 800 (was 1000). Variance ratio held at 33 % of base.
+
+**Math sanity check on entrainment at N=30**: at `blobEntrainScale=0.008` (v4.9) with ~10 simultaneous neighbors (up from ~8 at N=24), accumulated impulse coefficient ≈ 10·0.008·0.4 = 0.032. Still well under `cursorImpulseScale=0.1` — "whisper-level" coupling preserved.
+
+**Fallback**: if clumping returns at the now-actually-30 population, drop `blobEntrainScale` 0.008 → 0.006 (not a density rollback — the goal is more blobs, not fewer).
+
 ### Physics (v4.11 — cadence calibration; the density-target was a no-op since v3.2)
 
 While testing v4.10 (24 → 30) Lisa reported no visible difference. Tracing the cause uncovered a long-standing bug: **`TARGET_BLOB_COUNT_DESKTOP` does not control steady-state population. Spawn cadence does.**

@@ -51,7 +51,7 @@ import { type Vec2 } from "@/lib/chroma/physics";
 import { makeGrainPattern, renderFrame, renderFrameBaked } from "@/lib/chroma/render";
 import { getChromaAudio } from "@/lib/chroma/audio";
 
-const TARGET_BLOB_COUNT_DESKTOP = 24;
+const TARGET_BLOB_COUNT_DESKTOP = 30;
 const TARGET_BLOB_COUNT_MOBILE = 10;
 /** Mobile breakpoint (px). Mirrors the rest of the portfolio. */
 const MOBILE_BREAKPOINT = 640;
@@ -82,8 +82,8 @@ const STATIC_PALETTE_CHORD: Chord = {
  * per blob (cumulative ±21 px over 18 blobs) — enough to avoid a
  * metronomic look, not enough to feel chaotic.
  */
-const STEADY_CADENCE_BASE_MS = 3000;
-const STEADY_CADENCE_JITTER_MS = 1000;
+const STEADY_CADENCE_BASE_MS = 2400;
+const STEADY_CADENCE_JITTER_MS = 800;
 
 /**
  * Pre-roll: on mount we simulate the physics in CPU-only virtual time

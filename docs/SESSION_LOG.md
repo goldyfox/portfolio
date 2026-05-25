@@ -6,6 +6,189 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 18:33 — Lab — experiment header restructure + reorder
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `components/lab/typoglycemia-section.tsx` (edited), `app/lab/page.tsx` (edited).
+- What: Three-tier experiment header applied to every Lab experiment.
+  1. **Eyebrow** (was `<h2>` "01 — Typoglycemia"): now `<p>` "01 — Experiment" / "02 — Experiment". Generic label, no longer a heading since the label alone isn't semantically meaningful.
+  2. **Title** (was the big italic subtitle slot): now an `<h2>` with the experiment name (Chroma Capture, Typoglycemia). Same `clamp(1.25rem,2.5vw,1.75rem)` size, dropped italic (proper nouns shouldn't lean) and 80% opacity (full-strength as the actual heading).
+  3. **Subtitle** (new): smaller body description at 16px italic font-serif, 70% opacity, 56ch max-width. Italic distinguishes it from the 18px non-italic page intro at the top of `/lab`.
+- Also: reordered experiments — Chroma Capture is now 01, Typoglycemia is 02. Chroma is visually stronger and pulls a visitor in faster.
+- Decisions:
+  - **Title is real `<h2>`, eyebrow is `<p>`**. Semantic ordering: page H1 = "Lab", section H2 = experiment name. The eyebrow "01 — Experiment" alone isn't a meaningful heading; it's a numbered label.
+  - **Title non-italic**. Proper nouns. The previous italic in the subtitle slot was decorative; for an actual title it reads weird.
+  - **Subtitle italic, 16px**. Reads as descriptive lede / hint at instructions, not body prose. Visually subordinate to both the 18px page intro and the title above it.
+  - **Dropped the `<span className="not-italic">` space wraps** on Chroma's description. They were a micro-fix for the old huge-italic-subtitle treatment; at 16px italic the kerning isn't visibly off.
+
+### 18:29 — Chroma Capture — resize stutter fix
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited).
+- What: Two changes to eliminate the blank-frame flicker during active drag-resize.
+  1. `applySize` now synchronously re-renders the current blob state at the end (guarded on `blobs.length > 0` to skip mount-time first call before pre-roll populates the field). Setting `canvas.width`/`canvas.height` wipes the backing store; without an immediate repaint the next rAF tick can be up to 16ms away, so the user sees a cream-blank frame during a drag-resize. The sync repaint closes that gap.
+  2. `ResizeObserver` callback now rAF-batches its `applySize` invocation. Multiple observer fires within one frame collapse to one resize + one repaint, instead of N resets per frame.
+- Decisions:
+  - **Sync repaint with `flashAlpha: 0`, `includeGrain: false`.** Mid-capture-flash resize is a non-existent path; the next rAF tick will resume correct flashAlpha. Grain stays off (matches live frame loop).
+  - **No CSS-transform transient scaling.** The simpler fix (immediate repaint at native resolution) is enough; no need for a transient blurry stretched canvas during drag.
+
+### 18:24 — Chroma Capture — watermark text black, not ethos-blue
+
+- Files: `lib/chroma/render.ts` (edited, line 228).
+- What: PNG watermark text changed from `#1313ec` (ethos-blue) to `#000000`. Scrim (cream @ 72% opacity) unchanged. Watermark only appears in the captured PNG, not in the live render.
+- Decisions: pure black, not a softer gray-900. Lisa was specific.
+
+### 18:19 — Chroma Capture — control icons switched to filled style
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited).
+- What: Camera, SpeakerOn, SpeakerOff icons converted from stroke (1.2px outline) to fill. Camera body uses `fillRule="evenodd"` to punch the lens circle out as negative space (no overlay needed for the cream button bg). Speaker cones are filled solid; sound-wave arcs and mute-X remain stroked (standard Heroicons-solid convention — open curves don't have a "filled" form, and detail-line strokes were bumped 1.2 → 1.4px to balance visual weight against the now-solid cone).
+- Decisions:
+  - **`fillRule="evenodd"` over a colored cut-out.** Cleaner: the lens is true negative space, works on any button bg without coordination.
+  - **Detail strokes stay strokes.** Sound waves and mute-X are line-art; they don't read better as filled shapes.
+
+### 18:12 — Chroma Capture v4.9 — entrainment 0.015 → 0.008 (anti-clumping pass)
+
+- Files: `lib/chroma/physics.ts` (edited).
+- What: After the v4.8 density bump to 24 blobs, lateral clustering became the dominant motion pattern — blobs would form 5–6-blob clumps with large empty regions elsewhere. Diagnosis: pairwise entrainment (blob-blob velocity coupling) at scale 0.015 was a "whisper" per-pair, but at N=24 each blob is within σ=130px of up to ~8 neighbors at once. Accumulated impulse dominated lateral motion. Halved the per-pair scale to 0.008. Option A from a four-option plan (A = single lever, conservative).
+- Decisions:
+  - **One lever, not three.** Lisa picked the conservative single-variable change. Cleaner to evaluate. If still clumping, B (faster upward) and C-extras (tighter σ, less horizontal noise) remain on the table.
+  - **Did not touch `blobSigma`.** Reducing the entrainment radius would change the *shape* of the influence (sharper falloff with distance) on top of the strength change. Keeping σ constant means only the magnitude of the force changed, not its spatial profile.
+  - **Did not touch `vTerminal`.** Faster upward motion was a separate option (B). The current "hypnotic slow rise" is part of the lava-lamp character; only weaken if the entrainment fix alone is insufficient.
+
+### 18:03 — Chroma Capture v4.8 — density 18 → 24 blobs
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited).
+- What: Pass 3 of the 3-pass plan. Bumped `TARGET_BLOB_COUNT_DESKTOP` from 18 to 24 (+33%). Mobile (`TARGET_BLOB_COUNT_MOBILE = 10`) untouched — Lisa specified desktop only.
+- Decisions:
+  - **24, not 26.** Lisa picked the conservative end of the recommend range. Easy to bump further if still sparse.
+  - **Radius range held.** Original Option A bundled +20% on radius range; Lisa specified count only. Single-variable change = clean evaluation.
+  - **Mobile untouched.** Mobile playfield is smaller; the existing 10-blob density looks proportionate. Will revisit if a mobile review surfaces issues.
+- Perf note: at 24 blobs the physics tick is still O(n²) for pairwise entrainment, but n=24 is fine on modern hardware; should hold 60fps. Watch for jank on first reload.
+
+### 17:55 — Chroma Capture v4.7a — neon yellow L=0.84 → 0.78
+
+- Files: `lib/chroma/color.ts` (edited).
+- What: After v4.7 ALPHA_BOOST lift, the neon yellow (already L=0.84, brightest tier) was reading as highlighter-pen against the cream background, overpowering the rest of the palette. Dropped L to 0.78 — still distinctly brighter than the light tier (L=0.66) but proportionate. Hue (92) and chroma (0.21) unchanged. Updated palette comments to reflect the new neon tier lightness.
+- Decisions:
+  - **L only, not C.** Reducing chroma would mute the neon character. The brightness was the issue, not the saturation.
+  - **0.78 lands in the middle of the safety range.** L=0.72 would push toward "school bus yellow" (less neon). L=0.84 was the over-bright case. 0.78 is the defensible middle.
+
+### 17:51 — Chroma Capture v4.7 — saturation lift (ALPHA_BOOST 1.08 → 1.15)
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: Pass 2 of the 3-pass plan. Bumped final alpha boost from 1.08 to 1.15 (~+7pp). SVG side: four matrix scalars in the final feColorMatrix. JS side: `ALPHA_BOOST` constant. Comments updated.
+- Decisions:
+  - **+7pp instead of more aggressive.** Lisa's original "5–10% too low" remark put the right range at +5–10pp. 1.15 lands in the middle. If it now reads "too thick" against cream, drop to 1.12. If still pastel, bump to 1.18.
+  - **No other parameters touched.** Pass 2 is the one-variable change; isolating it makes the visual evaluation clean.
+
+### 17:48 — Chroma Capture v4.6/4.6a/4.6b grain abandoned, reverted to v4.5a
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: Three v4.6 grain attempts (post-composite multiplicative noise, finer-frequency variant, pre-threshold additive perturbation) all read wrong on moving blobs — either pixelated interiors or static noise fields with blobs sliding through. Lisa called it: proper material-feel grain on a kinetic surface needs per-frame noise regeneration or blob-local noise, which is a separate animation engineering scope. Reverted SVG filter + JS capture to v4.5a baseline (two-blur chain + alpha boost, no grain).
+- Decisions:
+  - **Grain isn't going to work without proper animation work.** Architectural ceiling for SVG filter primitives on dynamic content. Acknowledged and parked.
+  - **All three v4.6 variants archived in DECISIONS.md** for reference if we ever pick this up again in a proper animation scope.
+- Open: Pass 2 (saturation 1.08 → 1.15) and Pass 3 (density 18 → 24) from the original 3-pass plan still on the table. Lisa's "nvm" could apply just to grain or to the whole 3-pass — need to confirm before continuing.
+
+### 17:43 — Chroma Capture v4.6b — edge-localized grain (pre-threshold noise injection)
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: v4.6 and v4.6a both applied noise as the LAST composite step, modulating output alpha across the whole silhouette interior. As blobs moved, interior pixels showed different noise each frame → Lisa's read: "consistent dot grain on a moving surface, looks pixelated." Her insight that texture should live at edges, not interiors, pointed to a structural fix.
+- Architecture change: noise is now INJECTED INTO the blurred alpha BEFORE the threshold cut.
+  - Interior alpha sits ~0.7 (well above 0.39 threshold). Noise ±0.08 perturbs to 0.62–0.78, all above cut → interior stays solidly opaque, NO grain.
+  - Edge alpha sits in the threshold ramp (0.39–0.42). Noise ±0.08 perturbs to 0.31–0.50, flipping pixels above/below cut in a noise-correlated pattern → silhouette boundary becomes gritty/eroded.
+- Filter graph changes:
+  - feTurbulence moved to AFTER alphaBlur, BEFORE threshold (was last step).
+  - feColorMatrix on noise rewritten as bias `0.16 0 0 0 -0.08` (was `0.33 0.33 0.33 0 0.65`) — output alpha now in [-0.08, +0.08] for additive perturbation (was [0.65, 1.0] for multiplicative).
+  - feComposite arithmetic added (k2=k3=1) to ADD noise to alphaBlur before threshold (was final compose).
+  - Final feComposite removed (no more post-output grain modulation).
+- JS capture changes (mirror):
+  - Pre-generate noise canvas: white noise + 1.5px blur (approximates feTurbulence fractalNoise at baseFreq=0.6).
+  - Threshold pass: sample noise R channel, remap to [-amp, +amp] in 0-255 space, ADD to blurred alpha before threshold formula.
+  - Removed the v4.6 post-composite grain block (the destination-in noise pass).
+- Parameters: baseFreq=0.6, numOctaves=2, EDGE_NOISE_AMPLITUDE=0.08.
+- Decisions:
+  - **Pre-threshold > post-composite.** Architecture matches Lisa's intuition AND real paint/ink physics. Grain emerges at the boundary by construction; interior pixels are stably opaque.
+  - **±0.08 amplitude.** Translates to ±3.5px edge displacement given the alpha ramp gradient at the threshold. Visible grit without massive shape distortion.
+  - **baseFreq=0.6.** Slightly chunkier than v4.6a's 0.9 — at the boundary, ~1.5-2px features read as visible grit rather than sub-pixel jitter. Could go lower (0.4) for more visible erosion if subtle, or higher (0.9) for finer crispness.
+
+### 17:40 — Chroma Capture v4.6a — fell back to Option A fine grain
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: Option B splatter grain (baseFreq=0.45) read as "scaly/pixelated" on the deep purple (L=0.40 dark tier) — each chunk's alpha modulation was dramatic against cream show-through. Pre-approved fallback executed: baseFrequency 0.45 → 0.9 (finer features), JS capture smoothing blur 2px → 1px to match. All other v4.6 parameters held (bias 0.65, numOctaves=2, seed=3, fixed).
+- Decisions:
+  - **Finer grain is dark-color-safer.** Chunky noise has visible features that resolve to discrete shapes on dark colors. Fine noise distributes variation across more pixels per visible chunk → reads as material texture instead of artifact mottling.
+  - **Surgical fall back, not full re-architect.** Only the noise frequency changed; the composite chain, bias, and silhouette pipeline stayed put. If finer grain now reads as "too subtle," next tunable is bias (0.65 → 0.55 for more aggressive).
+
+### 17:33 — Chroma Capture v4.6 — procedural noise grain (Option B "splatter")
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: Pass 1 of the 3-pass plan to close the gap to the kuro.store reference. Added procedural noise grain via SVG feTurbulence + final feComposite, mirrored in JS capture with blurred white-noise canvas + destination-in. Specifically NOT the v4.1 rejected static tile pattern — this noise is composited IN the silhouette so grain only appears where blobs are; as blobs translate the silhouette shows different parts of the noise field.
+- Parameters (Option B "splatter" grain):
+  - baseFrequency = 0.45 (chunky ~2–3px features; vs Option A's 0.9 fine grain)
+  - numOctaves = 2 (adds detail to chunks)
+  - bias = 0.65 (alpha modulation range 0.65–1.0; lower = more aggressive grain, higher = more subtle)
+  - seed = 3 (fixed; could animate per-frame for film-grain shimmer if static feel persists)
+- JS capture approximation: white noise per-pixel + 2px canvas blur (matches feTurbulence fractal smoothness within visual tolerance).
+- Decisions:
+  - **Composite as last step.** Grain modulates the FINAL output alpha so displayed RGB (via pre-mult math) stays unchanged from v4.5a. Only opacity gets the grain texture.
+  - **`in` operator for grain composite.** Pre-mult math: result.RGB = output.RGB · noise.A, result.A = output.A · noise.A. Displayed RGB = (output.RGB · noise.A) / (output.A · noise.A) = output.RGB / output.A. Color preserved exactly.
+  - **Fixed seed, no animation yet.** Per-frame seed updates would give film-grain shimmer but cost JS overhead to update the DOM attribute. Defer until we know if fixed-seed reads as static.
+  - **Escalation plan documented**: if Lisa rejects v4.6 ("looks like sliding through static grain"), the next move is animating the feTurbulence seed every 2–3 frames. After that: fall back to Option A (finer grain, baseFrequency=0.9) which is less visible at any moment but still adds material feel.
+
+### 17:18 — Chroma Capture v4.5a — reverted edge feather, kept alpha boost
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: v4.5's σ=20 silhouette feather softened every blob boundary into a 60px Gaussian halo. Lisa's read: "looks like I need glasses, nothing to focus on" — meaning the lack of any crisp edge anywhere removed the visual anchor. Reverted the feather only: dropped the `feGaussianBlur σ=20` between threshold and composite (SVG side) and dropped the `stage2Soft` pass (JS side). Kept the 1.08× alpha boost since opacity wasn't the complaint.
+- Decisions:
+  - **Edge crispness is the focal anchor.** Soft colors inside + hard outline outside is the correct division of softness. Soften the WHOLE thing and the eye has nothing to grab.
+  - **Surgical revert, not full v4.4 rollback.** Lisa's "needs glasses" complaint maps cleanly to the feather, not the opacity boost. Keeping the alpha boost preserves the legitimate v4.5 improvement.
+  - **Lesson logged**: blur softness has diminishing returns past a single decoupled blur level. v4.4's σ=10 silhouette + σ=25 color was already two softness tiers; adding a third (σ=20 mask feather) erased the crisp tier without adding a new one.
+
+### 17:14 — Chroma Capture v4.5 — feathered silhouette edge + alpha boost
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited).
+- What: v4.4 shipped the parallel two-blur architecture but Lisa called interior opacity 5–10% too low and asked for a 20px blur on the blob edges. Both fixes layered onto v4.4 without disturbing silhouette geometry:
+  - **Silhouette feather** (σ=20): after threshold, blur the silhouette alpha mask with σ=20. Edge fades over ~60px (3σ) Gaussian instead of binary. Cut point preserved → silhouette SIZE unchanged.
+  - **Alpha boost** (1.08×): final `feColorMatrix` scaling RGB+A by 1.08 on SVG side (pre-mult rendering — both scale together to keep displayed color constant). JS capture pipeline scales only alpha bytes (canvas ImageData is straight alpha). Lifts interior ~8% to compensate for σ=25's Gaussian dilution.
+- Decisions:
+  - **Feather AFTER threshold, not relax the threshold.** Relaxing 30/-11.7 → wider ramp would shift the cut point and change silhouette SIZE. Re-blurring after threshold keeps geometry locked, only softens the alpha gradient outward.
+  - **Scale RGB+A together on SVG side.** Pre-mult alpha rendering: scaling only A would yield darker displayed colors (RGB/(s·A) < RGB/A). Scaling both keeps displayed RGB constant.
+  - **8% in the middle of the 5–10% range.** Tunable in one constant (ALPHA_BOOST in capture.ts; matrix values in section.tsx).
+  - **Risk acknowledged**: σ=20 silhouette feather extends visible edge ~60px outward. Blobs near the frame may visibly soften into the bezel. If clipping reads as wrong, σ_feather drops to ~10–15.
+
+### 17:08 — Chroma Capture v4.4 — parallel two-blur filter chain
+
+- Files: `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited), `docs/DECISIONS.md` (edited).
+- What: After three rounds of palette/threshold tuning at v4.3, the "stamped cores" + thin blend band character of single-blur compositing remained the gap to the reference good examples. Executed the escalation documented in v4.3's note — split the single σ=10 blur into two parallel pipelines:
+  - **Pipeline A**: σ=10 + threshold = crisp silhouette (alpha-only mask, RGB zeroed via colormatrix `0 0 0 0 0` rows for R/G/B).
+  - **Pipeline B**: σ=25 blur of `SourceGraphic` = soft RGB cloud (2.5× wider Gaussian).
+  - **Compose**: `feComposite(softColor, silhouette, in)` — soft cloud clipped to silhouette alpha. Output has the silhouette's crisp boundary and softColor's smoothed interior RGB.
+- JS capture pipeline mirrored: added stage 3 (canvas-native `blur(25px)` of stage 1), replaced the v4.3 "source-atop with stage 1" final step with `destination-in` of stage 2 on top of stage 3. Same equivalence to `feComposite operator="in"`.
+- Decisions:
+  - **Two blurs, not one.** σ=10 was constraining both silhouette geometry AND color spread. Decoupling lets each pipeline tune independently for its job.
+  - **σ=25 (2.5× silhouette).** Documented escalation range was "σ=20+"; 25 is the defensible middle. σ=20 if v4.4 still reads too pastel; σ=30+ if more ombre is wanted.
+  - **`operator="in"` over `atop`.** `in` preserves softColor's straight-RGB saturation by letting cream show through < 1 interior alpha. `atop` would force opaque but dim the displayed colors (pre-mult RGB / α=1). Saturation > opacity for this aesthetic.
+  - **Silhouette geometry untouched.** σ=10 blur + 30/-11.7 threshold both unchanged from v4.3. Motion read preserved exactly. The only thing that changed is what color paints inside the silhouette.
+- Math sources: Porter-Duff `in` composition (out.RGB = src.RGB · dst.A; out.A = src.A · dst.A), Gaussian-kernel response on parallel chains, pre-multiplied-alpha rendering.
+
+### 17:04 — Chroma Capture v4.3b — neon yellow hue shift (warmer)
+
+- Files: `lib/chroma/color.ts` (edited).
+- What: v4.3a's neon yellow at h=108 read as chartreuse/yellow-green ("too green"). Shifted hue to h=92 — essentially pure yellow with a hint of warmth, no green tint. L=0.84 and C=0.21 unchanged. `CHROMA_PALETTE_HUES` last hue updated 108 → 92. Header comment updated with v4.3b history note.
+- Decisions:
+  - **h=92, not h=85 or lower.** h=85 would start pulling toward orange and visually crowd goldenrod (h=55) on the wheel. h=92 keeps clear separation from goldenrod (37° gap) while still reading as pure yellow.
+  - **L and C held constant.** Lisa only flagged hue character ("too green"), not brightness or saturation. Tweaking those would muddy the diagnostic if the fix isn't enough.
+
+### 17:00 — Chroma Capture v4.3a — palette swap: warm navy → neon yellow
+
+- Files: `lib/chroma/color.ts` (edited), `docs/DECISIONS.md` (edited).
+- What: After reviewing v4.3, Lisa called the ombre still off and asked to drop warm navy in favor of neon yellow. Replaced palette entry `{ L: 0.40, C: 0.18, h: 255, name: "warm navy" }` with `{ L: 0.84, C: 0.21, h: 108, name: "neon yellow" }`. Updated `CHROMA_PALETTE_HUES` last element 255 → 108. Comment block rewritten to document the tri-modal (light/deep/neon) tier structure and why cool-side hues are now fully excluded.
+- Decisions:
+  - **Warm navy was the muddy blender, not v4.3 filter math.** The cool-edge hue (h=255) blended with analogous-warm neighbors through canvas alpha-compositing produces desaturated browns in the overlap zone — the "still not great ombre" Lisa flagged. Removing the offender is a cheaper diagnostic than the v4.4 two-blur escalation.
+  - **Third lightness tier (L=0.84) introduced for neon character.** L=0.66 would have read as "school-bus yellow," not neon. L=0.84 sits comfortably below cream (L=0.99) so the blob still reads as a discrete shape against background.
+  - **h=108 (yellow-green) instead of h=90 (pure yellow).** Slight cool shift toward chartreuse blends more gracefully with goldenrod (h=55) and the purples (h=285, 310, 315) — no jarring complementary clash on overlap.
+  - **C=0.21 verified in-gamut.** Yellows hit the highest in-gamut chroma at high L; 0.21 at L=0.84 h=108 is safely inside sRGB per `oklchToHex` inspection.
+  - **v4.4 (two-blur filter) still on the table** if the palette swap alone doesn't close the gap to the reference good examples.
+
 ### 23:46 — Chroma Capture v4.3 — smooth alpha falloff + sharpened threshold
 
 - Files: `lib/chroma/render.ts` (edited), `components/lab/chroma-capture-section.tsx` (edited), `lib/chroma/capture.ts` (edited), `docs/DECISIONS.md` (edited).

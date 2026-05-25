@@ -225,7 +225,7 @@ export function drawWatermark(
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#1313ec";
+  ctx.fillStyle = "#000000";
   ctx.fillText(WATERMARK_TEXT, right, cy);
   ctx.restore();
 }

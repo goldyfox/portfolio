@@ -1,29 +1,45 @@
 /**
- * PNG capture for Chroma Capture (v4 — palette + atop composition).
+ * PNG capture for Chroma Capture (v4.5a — two-blur chain + alpha boost,
+ * no grain).
  *
  * The live render relies on a CSS `filter: url(#chroma-goo)` applied
  * to the canvas element. `canvas.toBlob()` returns the RAW canvas
  * pixels without the CSS filter — so we replicate the full SVG filter
- * chain in JS:
+ * chain in JS. The chain:
  *
- *   1. Render blobs (soft alpha, palette colors) to `stage1`.
- *   2. Blur `stage1` → `stage2` (canvas-native CSS filter is fine here;
- *      only `url()` references were the problem).
- *   3. Threshold `stage2`'s alpha channel pixel-by-pixel — equivalent
- *      to `feColorMatrix` row `0 0 0 18 -7`. This is the goo silhouette.
- *   4. Composite `stage1` atop `stage2` on the output canvas via
- *      `globalCompositeOperation = "source-atop"` — equivalent to
- *      `feComposite operator="atop"`. Clips source colors strictly to
- *      the goo silhouette while preserving the soft inner gradient
- *      shape (the gradient-merge effect at overlap boundaries).
- *   5. Watermark on top.
+ *   Pipeline A — silhouette (crisp alpha mask):
+ *     1. Render blobs to `stage1`.
+ *     2. Blur stage1 with σ=10 → `stage2` (canvas-native blur).
+ *     3. Threshold stage2's alpha pixel-by-pixel (× 30, − 11.7·255).
+ *        Result is a crisp silhouette mask — A≈1 inside, 0 outside.
  *
- * v4.1: grain is disabled in both live render and capture to match.
- * A static tile pattern doesn't translate with the blobs and reads as
- * a screen filter rather than a material property; better to ship
- * grain-less than to ship a texture that fights the motion. The cream
- * FRAME stays out of the PNG; everything outside the goo silhouette
- * has alpha=0, so the PNG drops cleanly onto any background.
+ *   Pipeline B — soft color cloud:
+ *     4. Blur stage1 with σ=25 → `stage3`.
+ *
+ *   Compose:
+ *     5. Draw stage3 onto the output canvas (it becomes destination).
+ *     6. destination-in with stage2 — clip stage3 to silhouette alpha.
+ *     7. Alpha boost via ImageData pass (× 1.15, alpha only).
+ *     8. Watermark on top (source-over).
+ *
+ * Grain history: v4.6 / v4.6a / v4.6b explored procedural grain via
+ * feTurbulence and white-noise canvases, both as post-composite alpha
+ * modulation and as pre-threshold noise injection. All read incorrectly
+ * on moving blobs (either pixelated interiors or static noise fields
+ * with blobs in front). Proper material-feel grain on a kinetic surface
+ * needs per-frame noise regeneration or blob-local noise — a separate
+ * animation engineering scope, deferred.
+ *
+ * Why two parallel blurs: σ=10 alone keeps colors too tightly clustered
+ * around each blob's center (v4.3 "stamped cores"); σ=25 alone would
+ * dilute the silhouette boundary. Decoupling gives a crisp silhouette
+ * + smooth interior ombre.
+ *
+ * The cream FRAME stays out of the PNG: outside the silhouette has
+ * alpha=0, so the PNG drops cleanly onto any background. Interior
+ * pixels have alpha < 1 (softColor's pre-mult alpha × 1.15), which is
+ * intentional — drop the PNG on cream and the cream subtly shows
+ * through, matching the live render.
  */
 
 import { type Blob } from "./blob";
@@ -38,13 +54,25 @@ const CAPTURE_DPR = 2;
  * `chroma-capture-section.tsx`. Drift between the two will make the
  * captured PNG look different from the live render.
  */
-const GOO_BLUR_PX = 10;
+/** σ for the silhouette pipeline (Pipeline A). Tight blur for crisp
+ *  gooey outline before threshold. */
+const GOO_SILHOUETTE_BLUR_PX = 10;
+/** σ for the color pipeline (Pipeline B). Wider blur for smooth ombre
+ *  across merged shapes. 2.5× silhouette blur. */
+const GOO_COLOR_BLUR_PX = 25;
 /** v4.3: sharpened ramp from 18 / -7 → 30 / -11.7. Same cut point
  *  (blurred α ≈ 0.39), tighter semi-transparency band (0.39–0.42 vs
  *  0.39–0.44). Eliminates wash-out at thin gooey necks while keeping
  *  silhouette SIZE identical to v4.2. */
 const GOO_ALPHA_MULT = 30;
 const GOO_ALPHA_OFFSET_255 = 11.7 * 255;
+/** Scalar applied to output alpha to compensate for softColor's
+ *  Gaussian dilution. SVG side scales RGB+A together (pre-mult); JS
+ *  side scales only A (straight alpha) — net displayed result matches.
+ *  v4.5: 1.08 (initial). v4.7: 1.15 (lifted +7pp for saturation against
+ *  cream after the grain experiments confirmed v4.5a was clean enough
+ *  to handle a firmer interior). */
+const ALPHA_BOOST = 1.15;
 
 export interface CaptureOptions {
   /** Visible canvas width in CSS pixels. */
@@ -86,51 +114,76 @@ export async function captureToPng(opts: CaptureOptions): Promise<boolean> {
     grainPattern: null,
   });
 
-  // ---- Stage 2: blur stage1 onto stage2 ----
+  // ---- Stage 2: silhouette pipeline — blur σ=10 + alpha threshold ----
+  // Equivalent to SVG `feGaussianBlur σ=10` + `feColorMatrix` with the
+  // alpha row `30 -11.7`. RGB doesn't matter here because we'll only
+  // use stage2's alpha as a mask in step 5.
   const stage2 = document.createElement("canvas");
   stage2.width = stage1.width;
   stage2.height = stage1.height;
   const c2 = stage2.getContext("2d");
   if (!c2) return false;
-  // canvas-native blur works (the issue was only with url() refs).
-  c2.filter = `blur(${GOO_BLUR_PX * CAPTURE_DPR}px)`;
+  c2.filter = `blur(${GOO_SILHOUETTE_BLUR_PX * CAPTURE_DPR}px)`;
   c2.drawImage(stage1, 0, 0);
   c2.filter = "none";
-
-  // ---- Stage 3: alpha threshold via ImageData ----
-  const img = c2.getImageData(0, 0, stage2.width, stage2.height);
-  const data = img.data;
-  for (let i = 3; i < data.length; i += 4) {
-    const a = data[i];
+  const img2 = c2.getImageData(0, 0, stage2.width, stage2.height);
+  const data2 = img2.data;
+  for (let i = 3; i < data2.length; i += 4) {
+    const a = data2[i];
     const thresholded = a * GOO_ALPHA_MULT - GOO_ALPHA_OFFSET_255;
-    data[i] = thresholded < 0 ? 0 : thresholded > 255 ? 255 : thresholded;
+    data2[i] = thresholded < 0 ? 0 : thresholded > 255 ? 255 : thresholded;
   }
-  c2.putImageData(img, 0, 0);
+  c2.putImageData(img2, 0, 0);
 
-  // ---- Stage 4: atop composition — source colors clipped to goo ----
+  // ---- Stage 3: soft color pipeline — blur σ=25 of stage1 ----
+  // Equivalent to SVG `feGaussianBlur σ=25` of SourceGraphic. Source
+  // RGBs interpenetrate via Gaussian convolution; overlap zones blend
+  // smoothly. Stage3 keeps stage1's full RGB+alpha character, just
+  // wider-blurred.
+  const stage3 = document.createElement("canvas");
+  stage3.width = stage1.width;
+  stage3.height = stage1.height;
+  const c3 = stage3.getContext("2d");
+  if (!c3) return false;
+  c3.filter = `blur(${GOO_COLOR_BLUR_PX * CAPTURE_DPR}px)`;
+  c3.drawImage(stage1, 0, 0);
+  c3.filter = "none";
+
+  // ---- Stage 4: compose — softColor "in" silhouette ----
   const out = document.createElement("canvas");
   out.width = stage2.width;
   out.height = stage2.height;
   const co = out.getContext("2d");
   if (!co) return false;
 
-  // 4a. Goo silhouette as the destination layer (blurred + thresholded).
-  //     Inside the silhouette we have blurred source colors; outside is
-  //     fully transparent.
+  // 4a. Draw stage3 (soft color cloud) as the destination layer. This
+  //     has wide-blurred RGB + soft alpha across the whole canvas;
+  //     we'll clip it to the silhouette in 4b.
+  co.drawImage(stage3, 0, 0);
+
+  // 4b. `destination-in` with stage2 multiplies the existing destination
+  //     (stage3) by stage2's alpha. Equivalent to SVG
+  //     `feComposite(softColor, silhouette, in)`:
+  //       out.RGB = stage3.RGB * stage2.A
+  //       out.A   = stage3.A   * stage2.A
+  //     Inside the silhouette (stage2.A ≈ 1): stage3 passes through.
+  //     Outside (stage2.A = 0): output is transparent.
+  co.globalCompositeOperation = "destination-in";
   co.drawImage(stage2, 0, 0);
 
-  // 4b. feComposite atop equivalent. Draws stage1 (crisp source colors
-  //     with soft alpha) on top of the goo silhouette but ONLY where
-  //     the silhouette is opaque. Outside the silhouette: untouched
-  //     (still transparent). Inside the silhouette where stage1 has
-  //     partial alpha: blended with the goo's blurred colors (mostly
-  //     visible in gooey-neck regions where stage1 alpha is zero).
-  co.globalCompositeOperation = "source-atop";
-  co.drawImage(stage1, 0, 0);
-
-  // 4c. Grain disabled in v4.1 — matches the live render. A static
-  //     grain tile reads as a screen filter rather than a property of
-  //     the moving material. Toggle back on if we decide we want it.
+  // 4c. Alpha boost — pixel pass multiplying ONLY alpha by ALPHA_BOOST
+  // (1.15, v4.7) to lift interior opacity ~15%. Canvas ImageData is
+  // STRAIGHT alpha, so RGB stays put and the displayed color is
+  // unchanged; only the alpha channel goes up (clamped to 255). SVG
+  // mirror scales RGB+A together because feColorMatrix operates on
+  // pre-multiplied color.
+  const outImg = co.getImageData(0, 0, out.width, out.height);
+  const outData = outImg.data;
+  for (let i = 3; i < outData.length; i += 4) {
+    const boosted = outData[i] * ALPHA_BOOST;
+    outData[i] = boosted > 255 ? 255 : boosted;
+  }
+  co.putImageData(outImg, 0, 0);
 
   // Reset composite op for the watermark (drawn over everything).
   co.globalCompositeOperation = "source-over";

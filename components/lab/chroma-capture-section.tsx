@@ -63,33 +63,32 @@ export function ChromaCaptureSection() {
     <section id="chroma-capture" className="mt-macro">
       {/*
         Hidden SVG goo filter — referenced by the canvas element via its
-        CSS `filter: url(#chroma-goo)` style. v4 pipeline:
+        CSS `filter: url(#chroma-goo)` style. v4.5a pipeline (two-blur
+        chain + alpha boost, no grain):
 
-          1. feGaussianBlur (σ=10) — smear alpha edges so neighboring
-             blobs' alpha fields overlap.
-          2. feColorMatrix (alpha row: 18 -7) — snap blurred alpha back
-             to a hard amorphous silhouette. Cuts at ~0.39 blurred alpha.
-             This is the merged metaball outline. RGB rows are identity
-             so source colors survive untouched on this layer.
-          3. feComposite atop SourceGraphic — overlay the ORIGINAL
-             source pixels on top of the goo silhouette, clipped strictly
-             to the silhouette. Where the source has soft alpha (the
-             blob's gradient core/edge), the source color shows; where
-             the source has zero alpha (the gooey neck between blobs),
-             the blurred goo color fills in. Net effect: amorphous
-             silhouette (unchanged from v3.2) + soft internal source
-             colors visible inside it.
+          PIPELINE A — silhouette (crisp alpha mask):
+          1. feGaussianBlur (σ=10) of SourceGraphic → "alphaBlur".
+          2. feColorMatrix, RGB rows zeroed, alpha row `30 -11.7` →
+             "silhouette" (binary alpha mask, sharp edges).
 
-        Steps 1+2 alone (v3.2) define the silhouette — so motion read
-        is preserved exactly. Step 3 only changes what color paints
-        inside the silhouette; it does not extend the silhouette.
+          PIPELINE B — soft color cloud:
+          3. feGaussianBlur (σ=25) of SourceGraphic → "softColor".
 
-        Values 10 / 30 / -11.7 — v4.3 sharpened the threshold ramp from
-        the canonical 18 / -7 to eliminate semi-transparency in thin
-        gooey necks. Same CUT POINT (blurred α ≈ 0.39), tighter ramp to
-        fully opaque (0.42 instead of 0.444). Silhouette SIZE unchanged
-        — only the alpha softness across the edge band reduces. Capture
-        pipeline (lib/chroma/capture.ts) mirrors these values.
+          COMPOSE + BOOST:
+          4. feComposite(softColor, silhouette, in) → "composed".
+          5. feColorMatrix scaling RGB+A by 1.15 (v4.7 — was 1.08 in
+             v4.5a, lifted +7pp for saturation against cream) → output.
+
+        v4.6 / v4.6a / v4.6b explored procedural grain via feTurbulence
+        — first as post-composite alpha modulation (read as pixelated
+        moving surface), then as pre-threshold edge injection (still
+        read as static noise field with moving blobs in front of it).
+        All three reverted; proper material-feel grain on a kinetic
+        surface needs per-frame noise regeneration or blob-local noise
+        fields, which is a separate animation engineering scope.
+        See DECISIONS.md v4.6b for the architecture archive.
+
+        Capture pipeline (lib/chroma/capture.ts) mirrors all of this.
       */}
       <svg
         aria-hidden
@@ -98,31 +97,40 @@ export function ChromaCaptureSection() {
       >
         <defs>
           <filter id="chroma-goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="alphaBlur" />
             <feColorMatrix
-              in="blur"
+              in="alphaBlur"
               type="matrix"
-              values="1 0 0 0 0
-                      0 1 0 0 0
-                      0 0 1 0 0
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
                       0 0 0 30 -11.7"
-              result="goo"
+              result="silhouette"
             />
-            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="25" result="softColor" />
+            <feComposite in="softColor" in2="silhouette" operator="in" result="composed" />
+            <feColorMatrix
+              in="composed"
+              type="matrix"
+              values="1.15 0    0    0    0
+                      0    1.15 0    0    0
+                      0    0    1.15 0    0
+                      0    0    0    1.15 0"
+            />
           </filter>
         </defs>
       </svg>
 
       <div className="border-t border-[#fdfbf7]/10 pt-8">
-        <h2 className="font-sans text-[11px] uppercase tracking-[0.1em] text-[#fdfbf7]">
-          02 &mdash; Chroma Capture
+        <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-[#fdfbf7]">
+          01 &mdash; Experiment
+        </p>
+        <h2 className="mt-4 font-serif text-[clamp(1.25rem,2.5vw,1.75rem)] leading-[1.2] text-[#fdfbf7]">
+          Chroma Capture
         </h2>
-        <p className="mt-4 max-w-[44ch] font-serif text-[clamp(1.25rem,2.5vw,1.75rem)] leading-[1.4] italic text-[#fdfbf7]/80">
-          A color field, in motion. Move through it to nudge.
-          <span className="not-italic"> </span>
-          Click to pop &mdash; colors play as chords.
-          <span className="not-italic"> </span>
-          Tap the camera to save the moment.
+        <p className="mt-3 max-w-[56ch] font-serif text-[16px] leading-[1.6] italic text-[#fdfbf7]/70">
+          A color field, in motion. Move through it to nudge. Click to
+          pop. Tap the camera to save the moment.
         </p>
 
         {/* Framed playfield */}
@@ -189,40 +197,38 @@ function IconCamera() {
       width="16"
       height="16"
       viewBox="0 0 16 16"
-      fill="none"
       aria-hidden
     >
       <path
-        d="M3 5h2l1-1.5h4L11 5h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M3 5h2l1-1.5h4L11 5h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm5 6.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8Z"
+        fill="currentColor"
       />
-      <circle cx="8" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   );
 }
 
 function IconSpeakerOn() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
       <path
         d="M3 6h2l3-2.5v9L5 10H3V6Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
+        fill="currentColor"
       />
       <path
         d="M10.5 6.2c.6.5 1 1.2 1 1.8s-.4 1.3-1 1.8"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeLinecap="round"
+        fill="none"
       />
       <path
         d="M12 4.4c1.3 1 2 2.3 2 3.6s-.7 2.6-2 3.6"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeLinecap="round"
+        fill="none"
       />
     </svg>
   );
@@ -230,18 +236,17 @@ function IconSpeakerOn() {
 
 function IconSpeakerOff() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
       <path
         d="M3 6h2l3-2.5v9L5 10H3V6Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
+        fill="currentColor"
       />
       <path
         d="M11 6 14 9M14 6l-3 3"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeLinecap="round"
+        fill="none"
       />
     </svg>
   );

@@ -51,7 +51,7 @@ import { type Vec2 } from "@/lib/chroma/physics";
 import { makeGrainPattern, renderFrame } from "@/lib/chroma/render";
 import { getChromaAudio } from "@/lib/chroma/audio";
 
-const TARGET_BLOB_COUNT_DESKTOP = 18;
+const TARGET_BLOB_COUNT_DESKTOP = 24;
 const TARGET_BLOB_COUNT_MOBILE = 10;
 /** Mobile breakpoint (px). Mirrors the rest of the portfolio. */
 const MOBILE_BREAKPOINT = 640;
@@ -160,6 +160,17 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
     const [, force] = useState(0);
 
     // ----- DPR + resize ----------------------------------------------------
+    /**
+     * Resize the canvas backing store + CSS box and re-apply the DPR
+     * transform. Setting `canvas.width`/`canvas.height` wipes the backing
+     * store to transparent and resets all 2D context state, so we must
+     * (a) re-scale the context for DPR after every resize, and (b)
+     * synchronously re-render the current blob state at the end. The
+     * sync repaint is the difference between "smooth" and "stutter":
+     * without it, an active drag-resize wipes the canvas and the next
+     * rAF tick can be up to ~16 ms away, so the user sees a blank cream
+     * frame for one or two paint cycles.
+     */
     const applySize = useCallback(() => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
@@ -180,6 +191,23 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
       sizeRef.current = { width: cssW, height: cssH };
       targetBlobCountRef.current =
         cssW < MOBILE_BREAKPOINT ? TARGET_BLOB_COUNT_MOBILE : TARGET_BLOB_COUNT_DESKTOP;
+
+      // Sync repaint with current state — eliminates the "blank frame"
+      // gap between resize and next rAF tick. Guarded on having blobs
+      // to skip the very first applySize() at mount, which runs before
+      // pre-roll populates the field.
+      if (ctx && blobsRef.current.length > 0) {
+        renderFrame(ctx, blobsRef.current, {
+          width: cssW,
+          height: cssH,
+          nowMs: performance.now(),
+          chord: chordRef.current,
+          includeGrain: false,
+          includeWatermark: false,
+          flashAlpha: 0,
+          grainPattern: grainPatternRef.current,
+        });
+      }
     }, []);
 
     // ----- Spawn helpers ---------------------------------------------------
@@ -442,8 +470,18 @@ export const ChromaCaptureCanvas = forwardRef<ChromaCanvasHandle, ChromaCanvasPr
       lastFrameMsRef.current = nowMs;
       force((n) => n + 1);
 
-      // Resize observer.
-      const ro = new ResizeObserver(() => applySize());
+      // Resize observer. ResizeObserver can fire multiple times per
+      // frame during an active drag-resize; rAF-batch the applySize
+      // calls so we collapse to at most one resize + repaint per frame.
+      let resizeQueued = false;
+      const ro = new ResizeObserver(() => {
+        if (resizeQueued) return;
+        resizeQueued = true;
+        requestAnimationFrame(() => {
+          resizeQueued = false;
+          applySize();
+        });
+      });
       ro.observe(container);
 
       // Visibility: pause when hidden.

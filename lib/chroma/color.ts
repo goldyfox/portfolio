@@ -179,31 +179,46 @@ export function rotateHue(currentHue: number, degreesPerSecond: number, dt: numb
 }
 
 // ---------------------------------------------------------------------------
-// Chroma Capture palette (v4.2 — 8-hue, bimodal lightness)
+// Chroma Capture palette (v4.3a — 8-hue, tri-modal lightness)
 //
 // Six light warm hues at OKLCH L=0.66 C=0.22 form the core chord (the
 // original v4 analogous-warm anchors: indigo, magenta, crimson, coral,
-// tangerine, goldenrod). Two deep hues at L=0.40 C=0.18 add contrast —
-// deep purple (h=310) and warm navy (h=255). When a deep blob overlaps
-// a light blob, alpha-blend produces a mid-luminance gradient (L≈0.53),
-// which reads as the "deep gemstone" overlap effect.
+// tangerine, goldenrod). One deep hue at L=0.40 C=0.18 adds shadow
+// depth — deep purple (h=310). One bright accent at L=0.78 C=0.21
+// adds high-key pop — neon yellow (h=92).
 //
-// Why two lightness tiers, not one continuous range:
-//   • L=0.66 alone is what makes the warms read as "vibrant gallery
-//     pastels"; if every blob were dark the palette would feel oppressive.
-//   • L=0.40 alone would lose the vibrancy. Mixing the two creates
-//     selective depth without sacrificing the core character.
-//   • Continuous interpolation (L randomized per blob) was rejected —
-//     it would produce too many washed mid-tones (L≈0.55) that read
-//     as muddy, not deep.
+// History:
+//   • v4: 6 light warms only.
+//   • v4.2: added deep purple (h=310) + warm navy (h=255) at L=0.40.
+//   • v4.3a: warm navy removed (h=255 sat at the cool edge and produced
+//     muddy mid-tones when blending with analogous-warm neighbors —
+//     the alpha-mix of a cool deep with warm lights collapsed into
+//     desaturated browns). Replaced with neon yellow at L=0.84.
+//   • v4.3b: neon yellow hue shifted h=108 → h=92. h=108 read as
+//     chartreuse / yellow-green ("too green"); h=92 is essentially
+//     pure yellow with a hint of warmth, so it harmonizes with the
+//     warm anchors instead of leaning toward the excluded green zone.
+//   • v4.7: neon yellow lightness dropped L=0.84 → L=0.78 after the
+//     ALPHA_BOOST lift to 1.15 amplified L=0.84 + cream show-through
+//     into a highlighter-pen brightness that overpowered the rest of
+//     the palette. L=0.78 stays distinctly brighter than the light
+//     tier (0.66) while landing as "vivid pigment" rather than "neon
+//     marker."
 //
-// Why C=0.18 for the deep tier: high chroma at low lightness clips in
-// sRGB. Verified by inspection of `oklchToHex` — both deep entries
-// stay in-gamut at C=0.18.
+// Three lightness tiers — light (0.66), deep (0.40), neon (0.78):
+//   • Light tier anchors the warm vibrant character.
+//   • Deep purple anchors shadow / gemstone-overlap depth.
+//   • Neon yellow at L=0.78 reads as electric / fluorescent against
+//     cream (L=0.99) while staying distinguishable from background and
+//     proportionate to the other palette entries.
 //
-// Cool side (180–250°) still excluded apart from the warm navy
-// (h=255 is right at the warm edge of cool). Pure teal/cyan would
-// produce muddy mid-tones in any blend with the warm anchors.
+// Why C=0.21 for neon yellow: yellows hit the highest in-gamut chroma
+// of all hues at moderate-high L, so 0.21 sits comfortably in sRGB at
+// L=0.78 h=92. Verified by `oklchToHex` inspection.
+//
+// Cool side (180–250°) excluded entirely. Pure teal/cyan/navy produce
+// muddy mid-tones in any blend with the warm anchors (the warm navy
+// experiment in v4.2 confirmed this).
 // ---------------------------------------------------------------------------
 
 export interface PaletteEntry {
@@ -224,7 +239,7 @@ export const CHROMA_PALETTE: ReadonlyArray<PaletteEntry> = [
   { L: 0.66, C: 0.22, h: 35,  name: "tangerine" },
   { L: 0.66, C: 0.22, h: 55,  name: "goldenrod" },
   { L: 0.40, C: 0.18, h: 310, name: "deep purple" },
-  { L: 0.40, C: 0.18, h: 255, name: "warm navy" },
+  { L: 0.78, C: 0.21, h: 92,  name: "neon yellow" },
 ];
 
 /**
@@ -255,7 +270,7 @@ export function paletteColorForHue(hue: number): OklchColor {
  * Hue-only array, preserved for callers that just need the wheel
  * positions (e.g. `STATIC_PALETTE_CHORD`). Order matches `CHROMA_PALETTE`.
  */
-export const CHROMA_PALETTE_HUES = [285, 315, 350, 15, 35, 55, 310, 255] as const;
+export const CHROMA_PALETTE_HUES = [285, 315, 350, 15, 35, 55, 310, 92] as const;
 
 /** Sample one palette hue uniformly across all 8 entries. */
 export function randomPaletteHue(): number {

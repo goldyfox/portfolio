@@ -325,6 +325,335 @@ All motion derives from first principles:
 - **Mute toggle** with `localStorage` persistence (key: `chroma:muted`). Default unmuted at subtle master gain (0.14); silent default means most visitors miss the synesthesia layer.
 - AudioContext is **lazy-initialized on first pop**. Pop is a click → autoplay policy satisfied.
 
+### Physics (v4.9 — entrainment halved, anti-clumping pass)
+
+After v4.8 (24 blobs), lateral clustering became dominant: 5–6-blob clumps would form and large canvas regions would sit empty. Diagnosis: pairwise blob-blob entrainment at scale 0.015 was tuned as a "whisper" per pair, but with N=24 each blob is within σ=130px of up to ~8 neighbors simultaneously. The accumulated impulse defeated the math-claimed 2:1 vertical:horizontal RMS ratio. Halved `blobEntrainScale` from 0.015 → 0.008.
+
+**Why this lever and not others**: four options were on the table — (A) halve entrainment scale, (B) faster `vTerminal` (-10 → -16), (C) combine A + B + tighten `blobSigma` 130 → 100, (D) C plus halve horizontal noise. Lisa picked A — the conservative single-variable change. Lets us evaluate whether entrainment alone is the dominant clumping force before touching the lava-lamp slow-rise character or the spatial profile of the influence.
+
+**Tunable lever**: `PHYSICS_DEFAULTS.blobEntrainScale` in `lib/chroma/physics.ts`. Currently 0.008; range 0.005 (very independent) ↔ 0.008 (current) ↔ 0.015 (original, clumpy at N=24) ↔ 0.02 (visible chain reaction).
+
+**Held constant**: `vTerminal=-10` (slow hypnotic rise preserved), `blobSigma=130` (influence radius and falloff shape unchanged), `sigmaDriftX=2` (lateral noise unchanged), `tauDriftY=2.5`, `tauDriftX=14`, density (24 desktop / 10 mobile).
+
+**Math sanity check**: at the original 0.015 with 8 simultaneous neighbors averaging Gaussian weight 0.4 (mid-σ distance), the accumulated impulse coefficient is 8·0.015·0.4 ≈ 0.048. At 0.008 it's ≈ 0.026 — roughly the same magnitude as `cursorImpulseScale=0.1` times one tenth, which is the intended "whisper" level.
+
+**Fallback path**: if still clumpy → Option B (`vTerminal` -10 → -14 or -16). If too independent / loses "fluid" character → 0.008 → 0.011 (halfway back to original).
+
+### Physics (v4.8 — density bump)
+
+Pass 3 of the post-comparison 3-pass plan. `TARGET_BLOB_COUNT_DESKTOP` bumped 18 → 24 (+33%). Goal: closer to reference-image density, more overlap events per minute, fewer "lonely island" blobs visible in any given moment.
+
+Mobile count (`TARGET_BLOB_COUNT_MOBILE = 10`) held — mobile playfield is smaller and 10 already feels proportionate.
+
+**Tunable lever**: `TARGET_BLOB_COUNT_DESKTOP` in `components/lab/chroma-capture-canvas.tsx`. Current 24; range 18 (original) ↔ 24 (current) ↔ 32 (aggressive — risks feeling cramped).
+
+**Perf consideration**: pairwise blob entrainment is O(n²) per tick. n=24 → 576 pair checks/tick, n=32 → 1024. Still well within frame budget on modern hardware. If FPS dips at 24, the entrainment check has a distance gate that already skips most pairs; could tighten further.
+
+**Held constant**: blob radius range (0.10–0.20 of min canvas dim), spawn cadence, vertical velocity, lateral drift, palette, filter pipeline.
+
+### Color (v4.7 — saturation lift)
+
+Pass 2 of the post-comparison 3-pass plan. After the v4.6 grain experiments confirmed v4.5a was clean enough to handle a firmer interior, lifted ALPHA_BOOST from 1.08 to 1.15.
+
+**The lever**: the final `feColorMatrix` in the SVG chain scales RGB + A by 1.15 (was 1.08). JS capture mirror scales alpha bytes by 1.15. Net effect on display: interior pixels read ~7 percentage points more opaque against cream. Saturated colors are amplified; the cream show-through that gave v4.5a its pastel character drops correspondingly.
+
+**Tunable lever**: `ALPHA_BOOST` constant in capture.ts, matrix scalars in chroma-capture-section.tsx. Currently 1.15; range 1.10 (subtle) ↔ 1.15 (current) ↔ 1.20 (firm). If colors read "thick" or opaque against cream, drop. If still pastel/washed, bump.
+
+**Held constant**: σ=10 silhouette, σ=25 color, threshold 30/-11.7, `in` composition, palette, physics.
+
+### Color (v4.6 family abandoned — grain doesn't work without animation engineering)
+
+After three architectural attempts at procedural grain — v4.6 (post-composite multiplicative noise, chunky), v4.6a (post-composite, fine grain), v4.6b (pre-threshold additive noise for edge-localized grit) — Lisa's verdict: "grain does not look correct on moving blobs, we would need to go much more heavy into animation design to fix this."
+
+**The fundamental ceiling**: SVG filter primitives generate noise once per filter eval. With a fixed seed, the noise field is screen-anchored across frames. With dynamic content (moving blobs), one of two failure modes always emerges:
+
+1. **Noise across the whole silhouette** (v4.6, v4.6a): every pixel inside every blob has noise. As blobs translate, interior pixels show different noise values each frame → reads as pixel jitter / pixelation on a moving surface, not material grain.
+
+2. **Noise at the edges only** (v4.6b): grain expresses only at the silhouette boundary. Edge moves with the blob, but the noise field underneath is still screen-anchored. Visually: blob slides across a fixed noise pattern, and the patch of noise it picks up at any moment varies. Better than #1 but still reads as "noise field with blob in front of it" rather than "blob with its own grain."
+
+**What would actually work** (deferred, not attempted):
+- Per-frame noise regeneration (animate feTurbulence seed every 1–3 frames for film-grain shimmer)
+- Per-blob noise fields (each blob renders with its own noise texture in blob-local coordinates, so noise translates and rotates with the blob)
+- Both at once (best result, most work)
+
+All three require real animation engineering — per-frame JS overhead to update SVG attributes, or a Canvas2D restructure to render per-blob with offscreen noise composition. Out of scope for a filter-pipeline tweak.
+
+**Architecture archive** (in case we ever revisit):
+
+- v4.6 chain ended with `feComposite(boosted, noiseAlpha, in)` where `noiseAlpha` was `0.33·noise.RGB + 0.65` biased alpha.
+- v4.6a swapped `baseFrequency=0.45` → `0.9` for finer grain.
+- v4.6b moved noise to `feComposite arithmetic(alphaBlur, noiseBias, k2=k3=1)` BEFORE the threshold, with `noiseBias.A = 0.16·noise.R − 0.08` for ±0.08 alpha perturbation.
+
+**Reverted to v4.5a baseline**: two-blur chain (σ=10 silhouette + σ=25 color), `feComposite(softColor, silhouette, in)`, `feColorMatrix ×1.08` alpha boost. No noise primitives in the filter graph.
+
+### Color (v4.6b — edge-localized grain via pre-threshold noise — ARCHIVED)
+
+v4.6 and v4.6a both applied noise as a post-composite alpha modulation, which produced "consistent dot grain on a moving surface" — Lisa's exact complaint. Every interior pixel of every blob got noise, and as blobs translated the noise pattern at each pixel changed independently. Read as pixelation rather than material texture.
+
+Lisa's insight cut to the actual problem: grain should be at the EDGES, not in the interiors. That's how real paint and ink work — substrate texture shows where pigment is thin, hides where pigment is thick.
+
+**Architecture — pre-threshold noise injection:**
+
+The silhouette pipeline cuts at blurred alpha = 0.39 (threshold matrix 30/-11.7). The ramp from "outside" to "inside" happens across blurred alpha 0.39-0.42 in a narrow band. INJECTING noise into the blurred alpha BEFORE the threshold means:
+
+- **Interior pixels** (blurred alpha ~0.7, well above the cut): noise ±0.08 perturbs them to [0.62, 0.78]. All still above the 0.39 cut. Interior stays solidly opaque. **Zero grain effect.**
+- **Edge pixels** (blurred alpha 0.39-0.42, in the ramp): noise ±0.08 perturbs them to [0.31, 0.50]. Individual pixels flip above or below the cut in a noise-correlated pattern. **Grain emerges as a gritty/eroded boundary.**
+
+This is structurally edge-localized by design. No "edge mask" needed — the threshold cut IS the edge, and noise only matters where the threshold cut happens.
+
+**Filter graph (v4.6b):**
+
+```
+SourceGraphic → feGaussianBlur σ=10 → alphaBlur
+feTurbulence baseFreq=0.6 numOctaves=2 → noiseRaw
+feColorMatrix (alpha row: 0.16 0 0 0 -0.08) → noiseBias    [noise.A ∈ [-0.08, +0.08]]
+feComposite arithmetic(alphaBlur, noiseBias, k2=k3=1) → noisyAlpha    [result.A = alphaBlur.A + noiseBias.A]
+feColorMatrix (alpha row: 30 -11.7, threshold) → silhouette
+SourceGraphic → feGaussianBlur σ=25 → softColor
+feComposite(softColor, silhouette, in) → composed
+feColorMatrix (×1.08 RGB+A) → output
+```
+
+**Parameters:**
+
+- `baseFrequency=0.6` — noise features ~1.5-2px wide. Slightly chunkier than v4.6a's 0.9 (which was finer), because at the edge cut the chunkier features read as visible grit instead of sub-pixel noise.
+- `numOctaves=2` — sub-detail in the features.
+- `seed=3` — arbitrary fixed value.
+- Noise amplitude = ±0.08 — perturbs blurred alpha by ±8 percentage points. Translates to ~±3-4px edge displacement given the alpha gradient at the threshold zone.
+
+**Why `feComposite arithmetic` for noise injection (not `add`):**
+
+SVG doesn't have a direct "add" composite. `arithmetic` with k1=0, k2=1, k3=1, k4=0 gives: result = 1·src + 1·dst + 0 = src + dst, per channel. Since noiseBias has RGB=0 (zeroed in colormatrix), only the alpha channel actually adds.
+
+**JS capture mirror:**
+
+White-noise canvas + 1.5px blur ≈ feTurbulence fractalNoise. Threshold pass samples noise's R channel per pixel, remaps `(noise - 127.5) / 127.5 * amplitude_bytes` to get a delta in [-amp, +amp] (0-255 space), adds to blurred alpha, then applies the (× 30, − 11.7·255) threshold formula. Visually within tolerance of SVG output.
+
+**Why this won't read as "static":**
+
+Even though the noise field is screen-anchored (same seed every frame), grain only appears at the silhouette boundary. As blobs move, the boundary moves with them. The eye sees: blob has gritty edge that travels with the blob. The noise field being static doesn't matter because the edge is where the noise is visually expressed, and the edge follows the blob.
+
+This is fundamentally different from v4.1 (overlay grain over the whole canvas) and v4.6 (grain across whole silhouette interior). Both of those had grain where the eye COULD see blobs sliding through fixed patterns. v4.6b has grain only where the silhouette is sharply transitioning — which is by definition where the blob's edge is right now.
+
+**REPLACES v4.6 and v4.6a entirely** — the post-composite noise step is removed; this is a structural reorganization, not a parameter tweak.
+
+**Held constant**: σ=10 silhouette blur (pre-noise), σ=25 color blur, threshold 30/-11.7, `in` composition, palette, physics, RENDER_OVERSCAN, ALPHA_BOOST=1.08.
+
+**Tunable levers:**
+- Noise amplitude (`0.16 / -0.08` in SVG matrix, `EDGE_NOISE_AMPLITUDE` in capture): 0.04 (subtle grit) ↔ 0.08 (current) ↔ 0.12 (heavy erosion).
+- baseFrequency: 0.4 (chunkier grit) ↔ 0.6 (current) ↔ 0.9 (finer).
+- numOctaves: 1 (uniform features) ↔ 2 (current, sub-detail) ↔ 3 (complex texture).
+
+### Color (v4.6 — procedural noise grain)
+
+After the v4.5a vs. reference comparison, grain texture was the biggest material-feel delta. The reference (kuro.store Chroma Vol.1) has pervasive grain that gives the gradient a "pigment in water" character; v4.5a had clean digital gradients. This is Pass 1 of a 3-pass plan to close the gap (v4.6 grain → v4.6.1 saturation lift → v4.7 density bump).
+
+**The constraint** — Lisa explicitly rejected the v4.1 static tile pattern because it didn't move with blobs ("looks weird to my eye"). The solution had to produce grain texture without re-creating that failure mode.
+
+**Architecture — why this is NOT static grain:**
+
+The v4.1 grain was a pre-rendered noise canvas painted as a fullscreen overlay AFTER the goo filter. Blobs slid past a fixed pattern. v4.6 grain is generated INSIDE the SVG filter pipeline via `feTurbulence` and composited IN the silhouette via `feComposite operator="in"`. Key properties:
+
+- Outside the silhouette (cream backdrop): zero grain visible. The composite is "in" the silhouette, so noise is only visible where the silhouette has alpha.
+- Inside the silhouette: noise modulates output alpha. Displayed RGB stays the same (pre-mult math preserves color), but interior opacity varies pixel-by-pixel with the noise field.
+- As blobs move: the silhouette shifts across the noise field. Each frame the blob shows DIFFERENT noise values at its position. The eye reads this as grain texture inside the material, not fixed background pattern.
+
+**Filter graph (v4.6, additions on top of v4.5a):**
+
+```
+SourceGraphic
+  ├── feGaussianBlur σ=10 → feColorMatrix (threshold) → silhouette
+  └── feGaussianBlur σ=25 → softColor
+feComposite(softColor, silhouette, in) → composed
+feColorMatrix (×1.08 RGB+A) → boosted
+feTurbulence baseFreq=0.45 numOctaves=2 → noise
+feColorMatrix (RGB→A averaging + 0.65 bias) → noiseAlpha
+feComposite(boosted, noiseAlpha, in) → output
+```
+
+**Parameters (v4.6a — Option A "fine grain", after Option B fallback):**
+
+- `baseFrequency=0.9` — fine grain. Features are ~1–2px wide. Started at Option B (0.45 chunky splatter) per Lisa's first preference; fell back to Option A after the chunky character read as "scaly/pixelated" specifically on the deep purple (L=0.40 dark tier). Diagnosis: each chunky noise feature's alpha modulation read dramatically against cream show-through on the dark base color. Finer noise distributes variation across more pixels per visible chunk → material texture instead of artifact mottling.
+- `numOctaves=2` — adds finer detail to the chunks. Single octave is uniform-chunked; two octaves has detail-within-detail.
+- `seed=3` — arbitrary fixed value. Could animate (per-frame increment) for film-grain shimmer if fixed-seed reads as static; deferred until we know.
+- `noiseAlpha` bias = 0.65 — alpha multiplier ranges 0.65–1.0. Means darkest grain points are 65% of original alpha (35% drop), brightest = no change. More aggressive (bias=0.5) would be heavier grain; more subtle (bias=0.8) would be barely-there.
+
+**Why `in` for the final composite (not `arithmetic` multiply):**
+
+`feComposite operator="in"` in pre-multiplied alpha space gives: result.RGB = src.RGB · dst.A, result.A = src.A · dst.A. Displayed RGB = result.RGB / result.A = (src.RGB · dst.A) / (src.A · dst.A) = src.RGB / src.A = original displayed color. Color preserved exactly; only alpha modulated.
+
+`arithmetic` with k1=1 would multiply each channel including RGB independently. Since noiseAlpha has RGB=0 (we zeroed it in the colormatrix), arithmetic would output (boosted.RGB · 0) = black. Wrong result.
+
+**JS capture mirror** (`lib/chroma/capture.ts`):
+
+SVG `feTurbulence` has no direct canvas equivalent; we approximate with white-noise canvas + light blur:
+1. Create grain canvas, populate ImageData with per-pixel random RGB (matches feTurbulence's gray noise) and per-pixel random alpha in [0.65, 1.0] (matches noiseAlpha bias).
+2. 2px canvas blur softens single-pixel sharpness toward fractalNoise smoothness.
+3. `destination-in` with the noise canvas → multiplies output alpha by noise alpha. Same result as SVG `feComposite in`.
+
+The approximation is visual, not mathematically exact — true Perlin noise would require an inline implementation. Within visual tolerance, the result reads identically.
+
+**Held constant**: σ=10 silhouette blur, σ=25 color blur, threshold 30/-11.7, `in` composition, palette, physics, RENDER_OVERSCAN, ALPHA_BOOST=1.08.
+
+**Tunable levers:**
+- `baseFrequency`: 0.3 (chunkier splatter) ↔ 0.45 (current) ↔ 0.9 (fine grain, Option A).
+- Bias in noiseAlpha matrix + `GRAIN_BIAS_MIN` in capture: 0.5 (aggressive) ↔ 0.65 (current) ↔ 0.8 (subtle).
+- Seed animation: fixed (current) ↔ per-frame increment (film-grain shimmer, defensible if fixed reads as static).
+
+**Escalation if v4.6 fails:**
+1. First try: animate seed per frame (or every 2–3 frames). Fixed JS attribute update on the SVG `<feTurbulence>` element.
+2. Second try: fall back to Option A (baseFrequency=0.9) — finer grain, less visible at any moment but still adds material character.
+3. Third try: apply grain only to captures, leave live render clean (split aesthetic — accepted last-resort).
+
+### Color (v4.5a — reverted edge feather, kept alpha boost)
+
+v4.5 added two surgical fixes to v4.4: σ=20 silhouette feather + 1.08× alpha boost. The feather softened the boundary alpha into a 60px Gaussian halo around every blob — and that was a mistake. Lisa's verbatim: "looks like I need glasses, nothing to focus on."
+
+**The diagnosis is clean**: without a crisp edge somewhere, the eye has no focal anchor. v4.4's design already had two softness tiers (σ=10 silhouette, σ=25 interior); adding a third (σ=20 mask feather) erased the only crisp tier (the silhouette boundary). The result reads as out-of-focus because EVERYTHING is now soft.
+
+**Resolution**: revert the σ=20 feather. Kept the 1.08× alpha boost — Lisa didn't complain about opacity, and the boost compensates correctly for softColor's Gaussian dilution.
+
+**Filter graph (v4.5a)** — identical to v4.4 except for the final alpha-boost matrix:
+
+```
+SourceGraphic
+  ├── feGaussianBlur σ=10 → feColorMatrix (threshold) → silhouette (crisp)
+  └── feGaussianBlur σ=25 → softColor
+feComposite(softColor, silhouette, in) → composed
+feColorMatrix (×1.08 RGB+A) → output
+```
+
+**Lesson logged** (call it the "two-tier softness" rule for this aesthetic):
+- One crisp tier (silhouette boundary)
+- One soft tier (interior color spread)
+- Adding a third softness tier between them destroys the crispness anchor.
+
+Future tunings should respect this division. If interior wants MORE softness: bump σ_color (currently 25 → 30+). If silhouette wants MORE softness: relax the threshold, NOT add a feather post-threshold. Adding a feather between the two tiers is the failure mode.
+
+**Held constant from v4.4**: σ=10 silhouette blur, σ=25 color blur, threshold 30/-11.7, `in` composition, palette, physics, RENDER_OVERSCAN.
+
+### Color (v4.5 — feathered silhouette edge + alpha boost)
+
+v4.4 shipped the parallel two-blur architecture and produced the smooth ombre Lisa was after, but with two remaining issues:
+1. Interior opacity sat 5–10% too low (the cream backdrop showed through more than it should).
+2. The silhouette boundary against cream read as hard-edged — the σ=10+threshold pipeline produces a near-binary alpha cut.
+
+v4.5 layers two surgical fixes on top of v4.4. Silhouette geometry is unchanged (cut point preserved exactly).
+
+**Fix 1 — Silhouette feather (σ=20)**:
+
+After the σ=10 blur + threshold produces a binary alpha mask, apply a second Gaussian blur (σ=20) to soften the mask edge. The cut point doesn't move — only the alpha falloff outward changes from binary-step to Gaussian-tapered. Visible feather band ≈ 60px (3σ).
+
+Filter graph addition:
+```
+silhouetteSharp (σ=10 + threshold) → feGaussianBlur σ=20 → silhouette
+```
+
+Why feather after threshold rather than relax the threshold:
+- Relaxing 30/-11.7 → wider alpha ramp (back toward v4.2's 18/-7) would shift the threshold cut point AND change silhouette geometry. The whole point of the v4.3 threshold tightening was to lock geometry; reverting that would undo motion-read correctness.
+- Re-blurring AFTER the threshold preserves the cut point — the threshold still happens at blurred-α ≈ 0.39 — and only re-spreads the alpha gradient outward. Silhouette SIZE unchanged.
+
+**Fix 2 — Alpha boost (1.08×)**:
+
+Final `feColorMatrix` scaling RGB + A together by 1.08. Lifts interior opacity ~8% to compensate for softColor's Gaussian dilution (σ=25 spreads each blob's alpha across ~75px radius, dropping average interior alpha to ~0.3–0.5 in v4.4).
+
+Filter graph addition:
+```
+feComposite(softColor, silhouette, in) → composed → feColorMatrix (×1.08 all channels) → output
+```
+
+Why scale RGB AND A together (not A alone) on the SVG side:
+- SVG filter pipeline operates on pre-multiplied alpha. Displayed RGB = pre-mult.RGB / A.
+- Scaling only A would yield displayed RGB = RGB / (1.08·A) < RGB/A — i.e. darker colors. Same color but more opacity requires scaling both.
+- Pre-mult after the scale: (1.08·RGB) and (1.08·A) → displayed RGB = (1.08·RGB)/(1.08·A) = RGB/A (same), output alpha = 1.08·A (boosted).
+
+Why scale ONLY A on the JS canvas side:
+- Canvas ImageData uses STRAIGHT alpha (not pre-mult). Stored RGB IS the displayed RGB; alpha is separate.
+- To boost opacity without darkening, scale alpha bytes alone, leave RGB bytes alone. Equivalent to the SVG result on display.
+
+**Held constant from v4.4**: σ=10 silhouette blur, σ=25 color blur, threshold 30/-11.7, `in` composition, palette, physics, RENDER_OVERSCAN.
+
+**Tradeoff acknowledged**: σ=20 feather extends visible silhouette ~60px outward beyond the v4.4 boundary. Blobs near the canvas frame can visibly soften into the bezel (cream edge). The frame is `bg-[#fdfbf7]` with a 1px `border-[#1313ec]/40`, so soft feathering into the cream is non-jarring — it reads as glow rather than clipping. If it ever does look clipped, σ_feather drops to ~10–15 (40–45px visible band).
+
+**Tunable levers**:
+- σ_feather (`stdDeviation` in section.tsx, `GOO_SILHOUETTE_FEATHER_PX` in capture.ts): 10 (subtle), 20 (current), 30 (heavy glow).
+- ALPHA_BOOST (matrix scalar in section.tsx, `ALPHA_BOOST` in capture.ts): 1.05 (subtle lift), 1.08 (current), 1.10 (firm lift).
+
+### Color (v4.4 — parallel two-blur filter chain)
+
+v4.3 + v4.3a + v4.3b left two issues unresolved against the reference good examples: (1) interior colors still read as "stamped" rather than gradient-blended across merged silhouettes, and (2) saturated cores at each blob's center made the overall composition look like discrete circles fused at the edges rather than one continuous color field.
+
+**Diagnosis** — the v4.3 filter graph used a single σ=10 Gaussian blur for BOTH alpha smoothing (silhouette) and RGB smoothing (color), then composited the source colors back on top via `feComposite atop`. The σ=10 spread is tight enough that color blending happens only at the immediate seam between blobs (~30px wide), while the atop step reasserted crisp source colors over the whole interior. Net: hard cores + thin blend band, not smooth ombre.
+
+**Resolution** — decouple the silhouette geometry from the color spread by running two parallel blur pipelines from `SourceGraphic`, then compose at the end.
+
+**Filter graph**:
+
+```
+SourceGraphic
+  ├── feGaussianBlur σ=10 → feColorMatrix (RGB zeroed, alpha 30/-11.7) → silhouette
+  └── feGaussianBlur σ=25 → softColor
+feComposite(softColor, silhouette, in) → output
+```
+
+**Pipeline A (silhouette)** — σ=10 blur + threshold. Same crisp gooey outline as v4.3. RGB rows in the threshold matrix changed from identity to zero so the output is a pure alpha mask. Silhouette geometry is unchanged from v4.3 (same blur σ, same threshold cut point) — motion read is preserved exactly.
+
+**Pipeline B (soft color)** — σ=25 blur of `SourceGraphic`. 2.5× wider Gaussian than the silhouette pipeline. Source RGBs interpenetrate via convolution across ~75px radius (vs ~30px for σ=10). Overlap zones between blobs now get smooth gradient blending; single-blob centers get diluted as their color spreads outward.
+
+**Compose** — `feComposite operator="in"`. Output = softColor's RGB and alpha, masked by silhouette's crisp alpha. Inside the silhouette boundary: σ=25-blurred colors. Outside: fully transparent.
+
+**Why `in` and not `atop`**:
+- `in`: output.A = softColor.A · silhouette.A. Interior alpha is < 1 (Gaussian dilution), so the cream backdrop subtly shows through, producing pastel-saturated gradients. Matches the reference look.
+- `atop`: output.A = silhouette.A = 1 inside. Forces opaque interiors but at the cost of dimmed pre-multiplied RGB (display RGB = softColor.pre-mult.RGB / 1, which is darker than softColor's straight RGB by a factor of softColor.A).
+- Saturation matters more than opacity for this aesthetic. Chose `in`.
+
+**Why two blurs, not one**:
+- σ=10 alone (v4.3) → tight color clusters, "stamped" cores.
+- σ=25 alone for both alpha + color → silhouette boundary dilutes to ~75px softness, killing the gooey motion read.
+- Decoupling preserves silhouette crispness while letting colors spread further. This is the canonical "parallel two-blur" technique referenced in v4.3's escalation note.
+
+**σ=25 chosen specifically**:
+- σ=20: still slightly tight; overlap zones blend but single-blob centers retain saturation. Could revisit if v4.4 reads too pastel.
+- σ=30+: heavy color smearing; risk of looking watered-down rather than ombre.
+- σ=25 is the middle of the documented "σ=20+" escalation range.
+
+**JS capture pipeline mirror** (`lib/chroma/capture.ts`):
+- Stage 1: render source (unchanged).
+- Stage 2: blur σ=10 + alpha threshold → silhouette alpha mask.
+- Stage 3: blur σ=25 of stage 1 → soft color cloud (canvas-native blur).
+- Stage 4: draw stage 3, then `globalCompositeOperation = "destination-in"` with stage 2 → stage 3 clipped to stage 2's alpha. Equivalent to `feComposite(softColor, silhouette, in)`.
+- Stage 5: watermark on top via `source-over` (unchanged).
+
+The captured PNG has alpha < 1 inside the silhouette (matching the SVG `in` composition), so drop it on any background and the background subtly tints the interior. Outside the silhouette is fully transparent, so the PNG drops cleanly on any color.
+
+**What this does NOT do**: change silhouette geometry, change palette, change blob physics, change RENDER_OVERSCAN. The motion read invariant is fully preserved. The change is purely how interior pixels get colored.
+
+**Tradeoff acknowledged**: interior saturation drops slightly compared to v4.3 (the σ=25 blur dilutes pre-multiplied RGB). The replacement quality — smooth gradients across merged shapes — is the explicit goal Lisa set with the reference good examples, where saturated centers are a NON-feature (the good examples have softly graded interiors, not stamped cores). If saturation feels too low in practice, the lever is σ_color (drop 25 → 20 → 15) or switch composite to `atop`.
+
+### Color (v4.3a — palette swap: warm navy → neon yellow)
+
+After v4.3 shipped, Lisa reviewed the output and said "still not great ombre happening" — but instead of escalating to v4.4 (the parallel two-blur filter chain), her next instruction was a palette change: drop warm navy, try neon yellow.
+
+**Diagnosis** — the v4.3 filter math was fine; the muddy ombre had a different cause:
+
+Warm navy at h=255 sits at the cool edge of the wheel. The v4.2 palette was eight hues that broke into seven warms + one cool, and the alpha-compositing blend between a cool deep blob and any warm light blob produces desaturated brown-gray mid-tones across the transition zone — perceptually "muddy ombre." The fix was not better blending math; it was removing the hue that blended badly.
+
+**Resolution**:
+
+- **Removed** `{ L: 0.40, C: 0.18, h: 255, name: "warm navy" }`.
+- **Added** `{ L: 0.84, C: 0.21, h: 108, name: "neon yellow" }` — a high-key fluorescent accent.
+- **Three lightness tiers now**: light (L=0.66, six warms), deep (L=0.40, deep purple), neon (L=0.84, neon yellow). Each tier has a discrete role; continuous L randomization is still rejected (would produce muddy mid-tones).
+
+**Why h=108 specifically**: pure yellow is around h=90–100; h=108 leans slightly green for a more neon/electric character (think highlighter ink, not school-bus paint). Crucially, it stays in the warm/yellow-green family — every blend now happens between hues that sit on the warm half of the wheel, so overlaps produce saturated transitions instead of desaturated browns.
+
+**Why L=0.84, not L=0.66**: L=0.66 with h=108 reads as olive/khaki — the opposite of neon. L=0.84 reads as fluorescent. Anything brighter (L=0.95+) starts blending into cream (L=0.99) and the blob loses its silhouette against background. L=0.84 is the brightest tier that still sits visibly below cream.
+
+**Why C=0.21**: yellows hit the largest in-gamut chroma at high L of any hue. C=0.21 at L=0.84 h=108 is well inside sRGB per `oklchToHex` inspection. Could push to C=0.23 for slightly more saturation, but 0.21 already reads as "neon" to the eye.
+
+**Cool side now fully excluded.** The v4.2 navy experiment was the test — it failed for the warm palette character, confirming the rule.
+
+**v4.4 (two-blur filter) still on the table** if the palette change doesn't close the gap to reference-quality ombre. That's an architectural change to the filter graph; defer until simpler tuning is exhausted.
+
 ### Color (v4.3 — smooth-falloff alpha + sharpened threshold)
 
 v4.2 produced two visible artifacts in captured PNGs against Lisa's reference imagery:

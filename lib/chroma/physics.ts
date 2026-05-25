@@ -255,8 +255,12 @@ export const PHYSICS_DEFAULTS = {
    *  at 50 px/s, which is contained by the velocity cap below. */
   cursorImpulseScale: 0.1,
   /** Blob-blob entrainment strength. Much smaller than cursor: the
-   *  chain reaction is meant to be a whisper, not a wave. */
-  blobEntrainScale: 0.015,
+   *  chain reaction is meant to be a whisper, not a wave. v4.9 reduced
+   *  0.015 → 0.008 — at N=24 blobs the accumulated pairwise impulses
+   *  (up to 8 neighbors within σ at once) were dominating lateral
+   *  motion and producing large stable clusters. Halving the per-pair
+   *  scale brings the sum back to whisper level. */
+  blobEntrainScale: 0.008,
   /** Blob-blob entrainment σ (px). */
   blobSigma: 130,
   /** Velocity-damping time constant for cursor-induced impulse (s). */

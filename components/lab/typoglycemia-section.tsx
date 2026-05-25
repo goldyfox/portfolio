@@ -275,10 +275,13 @@ export function TypoglycemiaSection() {
   return (
     <section id="typoglycemia" className="mt-macro">
       <div className="border-t border-[#fdfbf7]/10 pt-8">
-        <h2 className="font-sans text-[11px] uppercase tracking-[0.1em] text-[#fdfbf7]">
-          01 &mdash; Typoglycemia
+        <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-[#fdfbf7]">
+          02 &mdash; Experiment
+        </p>
+        <h2 className="mt-4 font-serif text-[clamp(1.25rem,2.5vw,1.75rem)] leading-[1.2] text-[#fdfbf7]">
+          Typoglycemia
         </h2>
-        <p className="mt-4 max-w-[36ch] font-serif text-[clamp(1.25rem,2.5vw,1.75rem)] leading-[1.4] italic text-[#fdfbf7]/80">
+        <p className="mt-3 max-w-[56ch] font-serif text-[16px] leading-[1.6] italic text-[#fdfbf7]/70">
           An essay you decode by scrolling.
         </p>
 

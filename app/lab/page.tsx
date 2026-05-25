@@ -19,9 +19,9 @@ export default function Lab() {
         I&rsquo;m building, testing, or just curious about.
       </p>
 
-      <TypoglycemiaSection />
-
       <ChromaCaptureSection />
+
+      <TypoglycemiaSection />
     </div>
   );
 }

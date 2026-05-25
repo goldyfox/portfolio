@@ -6,6 +6,18 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
+### 20:11 — Chroma Capture v4.11 — cadence calibration (the density-target bug)
+
+- Files: `components/lab/chroma-capture-canvas.tsx` (edited — target back to 24, cadence 3500 → 3000), `docs/DECISIONS.md` (edited — added v4.11 entry above v4.10, marked v4.10 SUPERSEDED).
+- What: Investigating "can't tell a difference between 24 and 30" uncovered a real architectural bug. **Spawn cadence — not `TARGET_BLOB_COUNT_DESKTOP` — has been governing equilibrium population since v3.2.** The math: `N_eq = traversal_time / cadence = 72 s / 4 s = 18`. Targets 24 (v4.8) and 30 (v4.10) were ceilings that didn't bind, because the spawn rate (1 per cadence interval) was always slower than the exit rate at N > 18. Pre-roll briefly fills to ~22, then field drains back toward 18 over ~30 s.
+- Resolution: roll target to 24 + drop `STEADY_CADENCE_BASE_MS` 3500 → 3000 ms. New equilibrium: 72 / 3 = 24. **Density is now actually 24, for real, in steady state.**
+- Decisions:
+  - **Future density changes require touching cadence.** Documented prominently in the new v4.11 DECISIONS entry with the full `N_eq = canvas_height / (|vTerminal| × cadence)` equation so a future agent doesn't repeat the mistake.
+  - **`TARGET_BLOB_COUNT_DESKTOP` is now correctly understood as a ceiling, not a target.** It caps the field but doesn't drive equilibrium. The lever is cadence.
+  - **v4.10 entry preserved with [SUPERSEDED] marker**, not deleted — keeps the chronological investigation legible.
+  - **Jitter held at 1000 ms.** Variance ratio is now 33 % of base (was 29 %); still well under "metronomic spawn" threshold.
+  - **v4.9 entrainment fix still holds**: it was tuned against equilibrium ~18–22, which is close enough to the new 24 that no re-tuning is needed yet. If clumping returns at the now-actually-24 population, drop `blobEntrainScale` 0.008 → 0.006.
+
 ### 20:00 — Chroma Capture v4.10 — density 24 → 30
 
 - Files: `components/lab/chroma-capture-canvas.tsx` (edited), `docs/DECISIONS.md` (edited — added v4.10 entry above v4.9).

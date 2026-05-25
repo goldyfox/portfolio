@@ -378,7 +378,34 @@ All motion derives from first principles:
 
 **Files**: `lib/chroma/render.ts` (added `renderFrameBaked`), `components/lab/chroma-capture-canvas.tsx` (added detection, stage refs, conditional render branch in tick, conditional filter in style).
 
-### Physics (v4.10 — density 24 → 30)
+### Physics (v4.11 — cadence calibration; the density-target was a no-op since v3.2)
+
+While testing v4.10 (24 → 30) Lisa reported no visible difference. Tracing the cause uncovered a long-standing bug: **`TARGET_BLOB_COUNT_DESKTOP` does not control steady-state population. Spawn cadence does.**
+
+**The relationship.** Equilibrium population `N_eq = traversal_time / cadence`. With `traversal = canvas_height / |vTerminal| = 720px / 10px·s⁻¹ = 72 s` and `STEADY_CADENCE_BASE_MS = 3500` (mean 4 s with jitter), `N_eq = 72 / 4 = 18`. Always 18, regardless of `TARGET_BLOB_COUNT_DESKTOP` once it's ≥ 18, because the cadence gates spawn rate and `N_eq` is the point where spawn rate equals exit rate.
+
+**What this means for prior versions.**
+- **v3.2 was correctly calibrated** for N=18 (the original target).
+- **v4.8 (18 → 24)** removed a ceiling that wasn't binding. The 90 s pre-roll briefly fills the field to ~22, then it drains back toward 18 over ~30 s post-mount. The lateral clumping Lisa flagged at v4.8 was real, but at population ~18–22, not 24 sustained.
+- **v4.9 (entrainment halved)** is therefore tuned against equilibrium ~18–22, not the nominal 24. Holds at the new v4.11 equilibrium of 24 because the relative density change is small.
+- **v4.10 (24 → 30)** was a true no-op. The field equilibrated at the same ~18 as everything since v3.2.
+
+**Resolution.** Roll target back to 24, drop `STEADY_CADENCE_BASE_MS` 3500 → 3000 so spawn rate matches the new equilibrium. Math: `72 / 24 = 3000 ms`.
+
+**Tunable levers**:
+- `TARGET_BLOB_COUNT_DESKTOP` in `components/lab/chroma-capture-canvas.tsx`: now 24 (was 30; before that 24 since v4.8). **This is now a true ceiling, not a target** — it caps the field but doesn't drive equilibrium.
+- `STEADY_CADENCE_BASE_MS` in `components/lab/chroma-capture-canvas.tsx`: 3000 (was 3500). **This is the actual density lever.** Drop further (e.g. 2400 ms) for higher equilibrium (N=30); raise (4000 ms) for lower (N=18).
+- `STEADY_CADENCE_JITTER_MS`: 1000 (unchanged). Variance ratio is now 33 % of base (was 29 %); still well clear of "metronomic spawn" perception.
+
+**Going forward, density changes require touching both knobs.** Any future density adjustment that doesn't move cadence is a no-op. Documented prominently here so a future agent doesn't repeat the mistake. The full lever equation is:
+
+```
+N_equilibrium = canvas_height / (|vTerminal| × cadence_seconds)
+```
+
+All three RHS factors are independent levers. Faster `|vTerminal|` shortens traversal (density drops if cadence held); slower cadence raises density; taller canvas raises density. Pick the lever whose side effects you can accept.
+
+### Physics (v4.10 — density 24 → 30) [SUPERSEDED by v4.11]
 
 Empirical test of the upper end of the v4.8 range. `TARGET_BLOB_COUNT_DESKTOP` bumped 24 → 30 (+25%) on Lisa's call after v4.9 broke up the lateral clumping that was the main risk of higher density.
 

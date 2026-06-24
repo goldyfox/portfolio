@@ -1,0 +1,7 @@
+# DreamHost Apache — static Next.js export (trailingSlash: true)
+ErrorDocument 404 /404.html
+
+# Optional: force HTTPS (DreamHost panel may already handle this)
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

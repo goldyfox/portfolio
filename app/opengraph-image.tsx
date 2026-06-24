@@ -5,6 +5,7 @@ import { join } from "node:path";
 export const alt = "Lisa Aufox — Product Design";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const dynamic = "force-static";
 
 const ETHOS_BLUE = "#1313ec";
 const ETHOS_CREAM = "#fdfbf7";

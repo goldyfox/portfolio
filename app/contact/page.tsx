@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+
+const CONTACT_ENDPOINT = process.env.NEXT_PUBLIC_CONTACT_FORM_URL;
 
 export default function Contact() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -21,6 +23,13 @@ export default function Contact() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!formValid) return;
+
+    if (!CONTACT_ENDPOINT) {
+      setStatus("error");
+      setErrorMsg("Contact form is not configured.");
+      return;
+    }
+
     setStatus("sending");
     setErrorMsg("");
 
@@ -32,11 +41,12 @@ export default function Contact() {
       deviceMemory?: number;
     };
 
-    const payload = {
-      name: formData.get("name"),
-      email: formData.get("email"),
-      message: formData.get("message"),
-      honeypot: formData.get("_hp"),
+    const name = formData.get("name");
+    const email = formData.get("email");
+    const message = formData.get("message");
+    const honeypot = formData.get("_hp");
+
+    const metadata = {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       screenResolution: `${window.screen.width}x${window.screen.height}`,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -59,20 +69,36 @@ export default function Contact() {
       pageUrl: window.location.href,
     };
 
+    // Formspree (static hosting) — _gotcha is their honeypot field name.
+    const payload = {
+      name,
+      email,
+      message,
+      _gotcha: honeypot,
+      _subject: `[Portfolio Contact] ${name}`,
+      ...metadata,
+    };
+
     try {
-      const res = await fetch("/api/contact", {
+      const res = await fetch(CONTACT_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Something went wrong.");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          (data as { error?: string }).error || "Something went wrong."
+        );
       }
 
       setStatus("success");
       form.reset();
+      setFormValid(false);
     } catch (err) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");

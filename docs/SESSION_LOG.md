@@ -4,6 +4,85 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ---
 
+## 2026-06-23 — Session 31: Navigation + Doodles layout
+
+### 19:55 — Deploy pivoted to static export (DreamHost shared/unlimited)
+- Files: `next.config.ts`, `scripts/deploy.sh`, `env.deploy.example`, `public/.htaccess`, `app/contact/page.tsx`, `app/opengraph-image.tsx`, `archive/api/contact-route.ts` (moved from `app/api/contact/`), `scripts/dreamhost-server-setup.sh` (deleted).
+- What: Lisa is on **Shared/unlimited** — no Node.js. Switched from standalone/PM2 to **`output: "export"`** + rsync `out/` to web root. Contact form now posts to **Formspree** via `NEXT_PUBLIC_CONTACT_FORM_URL` (baked at build from `.env.deploy`). Resend API route archived under `archive/api/`. Apache `.htaccess` for 404 + HTTPS redirect.
+- Decisions: Shared hosting = static only. Formspree replaces Resend for contact until/unless she moves to VPS. `rsync --delete` wipes server files not in `out/` — back up old site first.
+
+### 19:45 — DreamHost deploy script (Node standalone + rsync) — superseded by static export above
+
+### 18:20 — Resume logo swapped to favicon triangle (vector)
+- Files: `public/resume.pdf` (edited in place).
+- What: Replaced the old Autodesk-style "A" mark (9 stacked vector paths, bbox ≈ x119–158 / y36–73) with the site favicon triangle from `app/icon.svg` (`points 16,5 5,25 27,25`, ethos-blue). Removed the old paths via `apply_redactions(graphics=LINE_ART_REMOVE_IF_TOUCHED)` on the logo rect (capped above the "Lisa Aufox" bbox at y74.6 so text was untouched), then drew the triangle as a true vector polygon (PyMuPDF `Shape.draw_polyline` + `finish(fill=blue, closePath=True)`). Vector = infinitely sharp / fully antialiased at any zoom, not a raster paste. Mapped the favicon's 32×32 viewBox into a 38pt square centered on the old mark's center, anchored at the same top edge. Verified: exactly 1 top-region drawing remains (the blue triangle).
+- Decisions: Used vector polygon (not a high-DPI PNG) for crispness + small file size (resume now 32.9KB). Favicon's cream background square omitted — only the triangle is drawn so it sits on the resume's own ground.
+- Follow-up (18:23): Lisa wanted it bigger — resized the triangle to fill the old mark's **full** footprint exactly (apex at top-center, base corners at the old bbox: rect 119.3/36.0/158.2/73.0; width 38.9pt × height 37pt). The favicon's internal padding had made the first pass smaller than the old "A".
+- Follow-up (18:30): solid triangle felt heavy — changed to a **hollow outline**. Redacted the solid fill and redrew as a stroked triangle (`finish(color=blue, fill=None, width=4.5, closePath=True, lineJoin=0)` for sharp mitered corners). Centerline inset by ~W/2 so the outer stroke edge stays within the old footprint. Reads much lighter; still one vector shape. (Tunable: bump `width` for a heavier rule.)
+
+### 18:35 — Resume name set in Newsreader (matches portfolio titles)
+- Files: `public/resume.pdf` (edited in place).
+- What: Replaced the "Lisa Aufox" name from FiraSans-ExtraBold 24pt → **Newsreader Medium Italic** 34pt (ethos-blue), matching the site's title font (`--font-newsreader`, the `.page-title`/`font-serif italic` headline style). The project ships the face locally at `assets/fonts/newsreader-500-italic.woff`; converted woff→ttf with fontTools (`TTFont.flavor=None`), redacted the old name glyphs (tight rect between the triangle at y≈70.8 and the subtitle at y≈120), and re-set the text at the original baseline (origin 87.0, 103.7) via `insert_text(fontfile=…)`. `subset_fonts()` keeps the embed small (file 37KB).
+- Decisions: Used Newsreader **Medium Italic** (the available local italic; titles are 300–400 but 500 italic is the shipped weight) at 34pt to roughly match the old cap-height/footprint. Only the name changed — "Product Designer" subtitle + body stay Inter/sans. Size tunable.
+- Follow-up (18:58): Lisa — "too big, not thin enough, not centered." Reduced 34pt → **24pt** and **centered** the name on the shared axis x≈139.8 (midpoint of triangle center 138.75 and contact-block center 140.78), positioning via measured glyph width (`fitz.Font.text_length`) minus half-width, not left-anchored.
+  - **Bug fixed:** re-inserting onto the already-Newsreader'd PDF reused the existing font resource named `news` → glyphs rendered as .notdef tofu boxes. Fix: rebuild from the clean pre-font base (outlined triangle + original FiraSans name) and insert with a unique fontname (`NewsReaderItalic`). Lesson: when re-embedding a font into a PDF that already has one, use a fresh/unique fontname to avoid resource collision.
+  - **"Thinner" still open:** only Medium (500) italic ships locally; a true light (300/200) italic needs the Newsreader variable font. Network fetch (raw.githubusercontent.com variable TTF) hung and was interrupted. Left at Medium 24pt; Lisa skipped the choice to fetch a lighter weight — revisit if she wants it thinner.
+
+### 19:13 — Resume link opens in a new tab
+- Files: `components/footer-nav.tsx` (edited).
+- What: The footer "Resume" link (`/resume.pdf`) was a Next `<Link>` that navigated in-place. Added a `newTab` flag to the footer link model and render those as `<a target="_blank" rel="noopener noreferrer">`. Resume now opens in a new tab (correct for a static PDF). Typed the link array (`FooterLink`) and generalized the open-in-new-tab branch to cover both `external` and `newTab`. Only link to `/resume.pdf` is the footer (verified).
+- Decisions: PDF/asset links open in a new tab via plain anchor, not client routing.
+
+### 19:11 — Resume name REVERTED to original sans (Newsreader experiment dropped)
+- Files: `public/resume.pdf` (reverted name to original).
+- What: Lisa: the Newsreader italic "looks so good for case study titles, and so bad for my name." Diagnosis (grounded in the codebase): the site **header** wordmark is Newsreader italic **bold (700)** at 18px (`app/layout.tsx`), and **case-study titles** are Newsreader italic *light* at 56–120px — both work. The resume landed at **Medium (500) / 24pt**, the dead zone between a confident logotype and a delicate display headline, so it read as generic. A name is a **wordmark** (different type-system role than a title). Lisa chose to revert to the original heavy sans. Restored from `/tmp/resume-logo3.pdf` → FiraSans-ExtraBold "Lisa Aufox", ethos-blue, center_x 140.8 (matches contact block). Kept this session's wins: blue accents + outlined favicon triangle. File 32.9KB.
+- Decisions: **Resume name stays FiraSans-ExtraBold (heavy geometric sans), in blue** — pairs with the triangle, reads as a wordmark at small size. Do NOT re-propose the Newsreader serif italic for the name (title font ≠ wordmark). Net resume changes that shipped: red→blue accent recolor, Autodesk "A" → outlined favicon triangle.
+
+### 18:08 — Resume recolored to ethos-blue
+- Files: `public/resume.pdf` (edited in place).
+- What: The resume's coral-red accent was remapped to ethos-blue `#1313ec`. The PDF is a text/vector doc (NeuzeitGro + FiraSans), so this was a content-stream color swap (PyMuPDF), not a re-render — text stays selectable. Replaced the red fill `scn` operator triples `1 0.325 0.314` (name + section headers + logo mark), `0.943 0.337 0.329` (experience bullets), and `1 0.33 0.31` (shape) → `0.0745 0.0745 0.9255`. 13 operator hits; result = 20 text spans now `#1313EC`. Body grey `#343433`, dates `#666767`, the subtitle `#393742`, and the black speaking-section bullets (`#000000`) were intentionally left unchanged.
+- Decisions: Only the existing red brand accent → blue (faithful swap). Original recoverable from git history; session backup at `/tmp/resume-original-backup.pdf`.
+- Note: speaking-engagement bullets remain black (they were black in the original, separate from the red job bullets) — can flip to blue too if Lisa wants all bullets consistent.
+
+### 17:56 — Closed: FMUX tile header + Inbox Ads timing (no changes)
+- Files: none.
+- What: Lisa closed two lingering open items, no code changes:
+  - **FMUX tile Messenger header** (the "full header / Facebook bar + 'Lucky Shrub' business header" note from Session 30): **will NOT be added.** Rationale: the tile's focus is the icebreaker→sent animation (the component Lisa actually redesigned); adding header chrome at that small size would clutter and detract from it. Tile stays bubble-only as built.
+  - **Inbox Ads loop/motion timing:** **accepted as-is.** No further timing changes wanted.
+- Decisions: Both items resolved as "leave as-is." Do not re-propose adding the Messenger header to the FMUX tile.
+
+### 17:49 — Virtual-agent: add bottom Back to Index; close stale open items
+- Files: `app/index/virtual-agent/page.tsx` (edited), `app/doodles/page.tsx` (edited — copy).
+- What: Added `<BackToIndex />` (→ `/index`) at the **bottom** of the virtual-agent case study, wrapped in `mt-16` to match the page's section rhythm. The top generic `BackButton` ("← Back", `router.back()`) is **kept** — Lisa's explicit call: don't replace the top back button, just add a bottom Back-to-Index like the other case studies. Also updated the Doodles intro copy to "A collection of sketches, illustrations, and random thoughts."
+- Closed stale open items (corrected by Lisa):
+  - **Title casing** is NOT an open issue — all brief titles in `lib/content/briefs.ts` are already sentence case (the old "Title Case intentional" note predated the sentence-case standardization). No FMUX title-casing work remains.
+  - **FMUX assets** are no longer placeholders — that work is done.
+- Decisions: virtual-agent now has both a top `BackButton` and a bottom `BackToIndex` (intentional, per Lisa). The two are not unified.
+
+### 17:38 — Doodles: click-to-expand lightbox + drag/copy protection
+- Files: `components/portfolio/doodle-gallery.tsx` (created), `app/doodles/page.tsx` (edited), `app/globals.css` (edited).
+- What: Clicking any doodle now expands it into a full-size centered overlay with a **FLIP zoom**: the lightbox `<img>` starts at the clicked thumbnail's exact `getBoundingClientRect()` box, then transitions (`top/left/width/height`, 420ms, `cubic-bezier(0.22,1,0.36,1)`) to a viewport-fit box (90vw/90vh, aspect preserved) while a dark scrim (`rgba(12,12,18,0.92)`) fades in. Close (scrim/image click or Esc) reverses the zoom back into the thumbnail. Body scroll locks while open; overlay is portaled to `document.body`; respects `prefers-reduced-motion` (instant show/hide). Refactored the bento markup into a `"use client"` `DoodleGallery`; `page.tsx` stays a server component (keeps `metadata`) and passes the typed `doodles` array down. Added `priority` to the first (LCP) tile.
+- Anti-save: every image (thumbnail + overlay) gets `draggable={false}`, `onDragStart`/`onContextMenu` preventDefault, and a new `.img-protected` CSS class (`-webkit-user-drag/-touch-callout/user-select: none`). Blocks drag-to-desktop and long-press/right-click save in both states. (Not DRM — a determined user can still hit devtools/network; this stops casual drag/copy as asked.)
+- Decisions: Lightbox uses a hand-rolled FLIP (no motion library — none installed). Dark scrim is acceptable for a transient modal viewer even on a cream-forward page (it's chrome over the art, not page surface). Tiles are real `<button>`s for keyboard/a11y; `cursor-zoom-in`/`cursor-zoom-out` affordances.
+
+### 17:27 — Doodles: full-height images (no cropping)
+- Files: `app/doodles/page.tsx` (edited).
+- What: The `object-cover` 6-track grid was cropping every image top/bottom to fit fixed cells. Rebuilt the bento with explicit flex/grid containers and a local `Tile` helper that renders images at natural aspect (`h-auto w-full`, no `object-cover`). Row 1 = large tile at 2/3 width + a right 1/3 column with two stacked tiles; row 2 = two 50% tiles. `items-start` so a shorter column just leaves a gap at the bottom instead of stretching/cropping.
+- Decisions: Per Lisa — images render full-height, gaps are acceptable where row halves have unequal natural heights. Fixed-cell `object-cover` approach abandoned.
+
+### 17:10 — Doodles: editorial bento layout, full color
+- Files: `app/doodles/page.tsx` (edited).
+- What: Final layout is a **6-track CSS grid bento** (5 doodles): row 1 = large tile at 2/3 width (`col-span-4`, `row-span-2`) + two stacked tiles in the right 1/3 (`col-span-2` each); row 2 = two tiles at 50% (`col-span-3` each). Fixed `auto-rows-[clamp(6rem,20vw,15rem)]` so the large tile is exactly as tall as the two stacked ones; images `object-cover`. Also **removed the grayscale filter** — doodles stay full color; kept the `1.03` hover scale.
+  - Iteration history: flex justified-rows (rejected — even rows) → CSS-columns masonry (rejected — wanted a specific structure) → 2-col bento → this 6-track bento. The 6-track count is the LCM that serves both the 2/3 split (4/6) and the 50% split (3/6) in one grid.
+- Gotcha: mid-iteration the dev server's Turbopack stopped recompiling CSS (served a stale chunk; new `columns-*`/`break-inside` utilities never emitted — likely lingering from the earlier panic). Fixed by killing the dev server, `rm -rf .next`, and restarting. Lesson: if a newly-used utility class has no effect and the CSS chunk hash never changes, the dev cache is stale — restart with a clean `.next`.
+- Decisions: **Doodles are an explicit exception to the site-wide grayscale-to-color image rule** (`.cursor/rules/azure-ethos.mdc` / `docs/DESIGN.md`) — the artwork is colorful by nature. Layout is a fixed editorial bento, not masonry.
+
+### 16:56 — Back to Index buttons point to /index (was /)
+- Files: `components/portfolio/back-to-index.tsx` (edited).
+- What: The shared `BackToIndex` linked to `/` (homepage), but the work catalog lives at `/index`. Changed `href="/"` → `href="/index"`, fixing all four case studies that use it (inbox-ads, genai-conversations, journey-explorer, first-messaging-experience) in one place.
+- Note: `virtual-agent` uses a separate generic `BackButton` ("← Back", `router.back()` with `/` fallback), not a labeled Back-to-Index — left unchanged pending Lisa's call on whether to unify it.
+- Decisions: "Back to Index" = `/index`, not the homepage.
+
 ## 2026-06-22 — Session 30: Inbox-ads homepage tile — interactive surfaces triptych
 
 ### 18:40 — Inbox-ads tile: live triptych across IG / Messenger / MBS
@@ -40,12 +119,6 @@ Running daily log of decisions, references, and context. Future agents: **read t
 - Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (edited).
 - What: In `fade` mode the blue promote-arrow sits on top of the baked grey one. The baked icon is a heavier weight, so its arrowhead poked out behind the thinner blue glyph. Diagnosed by compositing the overlay over the real screen and zooming 4×. Fixed by dilating the 48px glyph alpha ~2px (re-embedded as the `ig-pano-i` PNG) and nudging the placement onto the arrowhead: `x 0.7602→0.762`, `y 0.0807→0.0824`, `w 0.07→0.073`. Blue now fully covers the grey without going chunky (a 3px dilation read as too fat).
 - Decisions: For `fade`-mode overlays, the blue glyph must be ≥ the baked icon's stroke weight, not just bbox — match weight, then position.
-
-### 16:56 — Back to Index buttons point to /index (was /)
-- Files: `components/portfolio/back-to-index.tsx` (edited).
-- What: The shared `BackToIndex` linked to `/` (homepage), but the work catalog lives at `/index`. Changed `href="/"` → `href="/index"`, fixing all four case studies that use it (inbox-ads, genai-conversations, journey-explorer, first-messaging-experience) in one place.
-- Note: `virtual-agent` uses a separate generic `BackButton` ("← Back", `router.back()` with `/` fallback), not a labeled Back-to-Index — left unchanged pending Lisa's call on whether to unify it.
-- Decisions: "Back to Index" = `/index`, not the homepage.
 
 ### 21:05 — IG glyph: abandon overlay, erase baked arrow + recolor in place (right fix)
 - Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (edited), `public/work/inbox-ads/screens/instagram.png` (edited).

@@ -255,6 +255,15 @@ section {
   }
 }
 
+/* Protected imagery (e.g. Doodles): block drag-to-desktop, long-press,
+   and text/image selection in both thumbnail and expanded states. */
+.img-protected {
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* ===================================================================
    Vault Theme — Lab page full-dark experience
    Applied via .vault-theme wrapper in app/lab/layout.tsx.

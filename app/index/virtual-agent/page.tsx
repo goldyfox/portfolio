@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { BackButton } from "@/components/portfolio/back-button";
+import { BackToIndex } from "@/components/portfolio/back-to-index";
 import { ScrollSpyTrigger } from "@/components/portfolio/scroll-spy-trigger";
 import { VoiceSpectrum } from "@/components/portfolio/voice-spectrum";
 import { AvaChatEmbed } from "@/components/portfolio/ava-chat-embed";
@@ -290,6 +291,11 @@ export default function VirtualAgent() {
           </p>
         </div>
       </section>
+
+      {/* Back to Index */}
+      <div className="mt-16">
+        <BackToIndex />
+      </div>
     </div>
   );
 }

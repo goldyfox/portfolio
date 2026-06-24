@@ -3,7 +3,7 @@ import type { CatalogRow, Domain } from "./types";
 export const catalogRows: CatalogRow[] = [
   {
     id: "business-ai-in-ads",
-    title: "AI Agents in Messaging Ads",
+    title: "AI agents in messaging ads",
     company: "Meta",
     year: "2026",
     domains: ["AI", "Messaging"],
@@ -14,18 +14,18 @@ export const catalogRows: CatalogRow[] = [
   {
     id: "first-messaging-experience",
     slug: "first-messaging-experience",
-    title: "First messaging experience in Messenger",
+    title: "Unified first messaging experience",
     company: "Meta",
     year: "2026",
     domains: ["Messaging"],
     summary:
-      "Chat component and first-message experience for Messenger ads — design strategy for advertiser and recipient entry into the thread.",
+      "Redesigning the icebreaker UI across Messenger and Facebook into one consistent, high-performing first-message experience for messaging ads.",
     visibility: "public",
   },
   {
     id: "genai-conversations",
     slug: "genai-conversations",
-    title: "Less Work, Better Ads with Generative AI",
+    title: "Less work, better ads with generative AI",
     company: "Meta",
     year: "2025",
     domains: ["AI", "Architecture"],

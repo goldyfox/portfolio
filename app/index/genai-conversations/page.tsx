@@ -35,10 +35,10 @@ export default function GenAiConversations() {
               <ScrollSpyTrigger title={brief.title} />
               <h1 className="font-serif italic leading-none text-gray-900 mb-12">
                 <span className="block text-5xl min-[768px]:text-[5.5rem] leading-[1.05] tracking-tight">
-                  Less Work, Better Ads
+                  Less work, better ads
                 </span>
                 <span className="block text-5xl min-[768px]:text-[5.5rem] leading-[1.05] tracking-tight ml-[10vw]">
-                  with Generative AI.
+                  with generative AI.
                 </span>
               </h1>
               <div className="border-l-4 border-ethos-blue pl-8 py-4">

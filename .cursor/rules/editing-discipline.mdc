@@ -1,0 +1,30 @@
+---
+description: Working and editing discipline — lessons to apply on every copy/code edit
+alwaysApply: true
+---
+
+# Editing discipline
+
+Hard-won lessons. Apply them before showing Lisa any edit.
+
+## 1. Look at the artifact before inferring
+
+If a fact lives in a file you can open — a screenshot, a video, a component — open it. Do not reason in circles about something you can verify in seconds. Ground claims in evidence; infer only when there is nothing to look at.
+
+- Example: which UI element came from which design is answered by reading `fb-before.png` and `msgr-before.png`, not by guessing.
+
+## 2. Edit in full context, never line-by-line
+
+Re-read the entire paragraph (or function) before AND after a change. A sentence that reads fine alone can break the passage — e.g. a forward reference to a term not yet introduced.
+
+## 3. Don't ship regressions while polishing
+
+Re-run the constraints already set before presenting: no em-dashes, Lisa's chosen punctuation, settled wording. "Improving" one thing must not reintroduce something already removed.
+
+## 4. Accurate facts beat good prose
+
+Wrong claims in polished copy are worse than plain accurate copy. Verify the claim is true (see #1) before refining its voice or rhythm.
+
+## 5. Don't re-litigate settled decisions
+
+Change the one thing asked. Leave everything already locked alone. Don't churn punctuation, wording, or layout the user has already approved.

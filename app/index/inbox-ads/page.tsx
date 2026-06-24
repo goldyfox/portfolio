@@ -34,7 +34,7 @@ export default function InboxAds() {
             <div className="border-t border-ethos-blue/20 pt-4 space-y-4">
               <div>
                 <p className="font-sans text-[10px] uppercase tracking-[0.15em] text-gray-400 mb-1">Role</p>
-                <p className="font-sans text-[13px] text-gray-800">Design Lead</p>
+                <p className="font-sans text-[13px] text-gray-800">Lead designer</p>
               </div>
               <div>
                 <p className="font-sans text-[10px] uppercase tracking-[0.15em] text-gray-400 mb-1">Surfaces</p>

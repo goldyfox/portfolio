@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Sender must be on a domain verified in the Resend dashboard.
+// Override via CONTACT_FROM_EMAIL if the address/domain changes.
+const FROM_ADDRESS =
+  process.env.CONTACT_FROM_EMAIL || "Lisa Aufox Portfolio <noreply@lisaaufox.com>";
+const TO_ADDRESS = process.env.CONTACT_TO_EMAIL || "lisaaufox@gmail.com";
+
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function getRateLimit(ip: string): boolean {
@@ -23,7 +29,30 @@ function getRateLimit(ip: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, message, honeypot, timezone, screenResolution, timeOnPage } = body;
+    const {
+      name,
+      email,
+      message,
+      honeypot,
+      timezone,
+      screenResolution,
+      viewport,
+      devicePixelRatio,
+      timeOnPage,
+      language,
+      languages,
+      platform,
+      deviceMemory,
+      hardwareConcurrency,
+      maxTouchPoints,
+      connection,
+      cookieEnabled,
+      doNotTrack,
+      prefersColorScheme,
+      prefersReducedMotion,
+      referrer,
+      pageUrl,
+    } = body;
 
     if (honeypot) {
       return NextResponse.json({ success: true });
@@ -60,10 +89,25 @@ export async function POST(request: NextRequest) {
       `--- SENDER METADATA ---`,
       `IP Address: ${ip}`,
       `User-Agent: ${userAgent}`,
-      `Referer: ${referer}`,
-      `Accept-Language: ${acceptLanguage}`,
+      `Platform: ${platform || "unknown"}`,
+      `Referer (header): ${referer}`,
+      `Referrer (client): ${referrer || "unknown"}`,
+      `Page URL: ${pageUrl || "unknown"}`,
+      `Accept-Language (header): ${acceptLanguage}`,
+      `Language: ${language || "unknown"}`,
+      `Languages: ${languages || "unknown"}`,
       `Timezone: ${timezone || "unknown"}`,
       `Screen: ${screenResolution || "unknown"}`,
+      `Viewport: ${viewport || "unknown"}`,
+      `Device pixel ratio: ${devicePixelRatio ?? "unknown"}`,
+      `Device memory (GB): ${deviceMemory ?? "unknown"}`,
+      `CPU cores: ${hardwareConcurrency ?? "unknown"}`,
+      `Max touch points: ${maxTouchPoints ?? "unknown"}`,
+      `Connection: ${connection || "unknown"}`,
+      `Cookies enabled: ${cookieEnabled ?? "unknown"}`,
+      `Do Not Track: ${doNotTrack ?? "unknown"}`,
+      `Color scheme: ${prefersColorScheme || "unknown"}`,
+      `Reduced motion: ${prefersReducedMotion ?? "unknown"}`,
       `Time on page: ${timeOnPage || "unknown"}s`,
       `Submitted: ${timestamp}`,
     ].join("\n");
@@ -79,8 +123,8 @@ export async function POST(request: NextRequest) {
     ].join("\n");
 
     await resend.emails.send({
-      from: "Portfolio Contact <onboarding@resend.dev>",
-      to: "lisa.aufox@gmail.com",
+      from: FROM_ADDRESS,
+      to: TO_ADDRESS,
       subject: `[Portfolio Contact] ${name}`,
       text: emailBody,
       replyTo: email,

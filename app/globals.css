@@ -21,6 +21,28 @@ body {
   border-top: 1px solid #1313ec;
 }
 
+/* Optimistic (Meta's brand VF) — used only for the GenAI tile's authentic
+   Ads-Manager "Conversations" title. Variable weight axis 300–800; .ttf shipped
+   unaltered per its license. */
+@font-face {
+  font-family: "Optimistic Display";
+  src: url("/fonts/optimistic.ttf") format("truetype");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* GenAI tile loading state — a left→right faded gradient pulses in and out */
+@keyframes genai-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* Azure Halo — large circular stroke, primary blue @ 10% */
 .azure-halo {
   position: fixed;
@@ -221,23 +243,13 @@ section {
   animation: shimmer 3s infinite;
 }
 
-.case-reveal {
-  opacity: 0;
-  transform: translateY(40px);
-  transition: all 1.2s cubic-bezier(0.85, 0, 0.15, 1);
-}
-
+.case-reveal,
 .case-reveal.active {
   opacity: 1;
-  transform: translateY(0);
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .case-reveal {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
   .shimmer-line::after {
     animation: none !important;
   }
@@ -334,6 +346,34 @@ body:has(.vault-theme) .page-title {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Curved text wrap — NYT-style shape-outside for body text.
+   The float creates the curved text boundary via shape-outside.
+   The image lives INSIDE the float so it occupies the same space. */
+.curved-text-wrap {
+  position: relative;
+}
+
+.curved-text-shape-right {
+  float: right;
+  width: 50%;
+  height: 560px;
+  shape-outside: ellipse(55% 50% at 70% 50%);
+  shape-margin: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .curved-text-shape-right {
+    float: none;
+    width: 100%;
+    height: 300px;
+    shape-outside: none;
+    margin-bottom: 2rem;
+  }
 }
 
 /* ===================================================================

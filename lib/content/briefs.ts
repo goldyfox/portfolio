@@ -3,7 +3,7 @@ import type { EditorialBriefData } from "./types";
 export const briefs: EditorialBriefData[] = [
   {
     id: "first-messaging-experience",
-    title: "First messaging experience in Messenger",
+    title: "Unified first messaging experience",
     subtitle:
       "Redesigning the icebreaker UI across Messenger and Facebook to create a consistent, high-performing first-message experience for messaging ads.",
     company: "Meta",
@@ -12,7 +12,7 @@ export const briefs: EditorialBriefData[] = [
     bet: "Facebook's bottom sheet icebreakers consistently outperformed Messenger's despite looking outdated. Neither platform looked like the other or behaved the same — and no one had a shared theory for why.",
     metrics: [
       { value: "+$10M/yr", label: "Incremental revenue" },
-      { value: "TBD", label: "CTR lift (experiment)" },
+      { value: "+0.40%", label: "CTR lift (experiment)" },
     ],
     constraint:
       "Two platforms with different design systems, different motion languages, and different interaction models. Any unified solution had to feel native on both while resolving the multi-tap edge case on bottom sheet.",
@@ -26,11 +26,11 @@ export const briefs: EditorialBriefData[] = [
   },
   {
     id: "genai-conversations",
-    title: "Less Work, Better Ads with Generative AI",
+    title: "Less work, better ads with generative AI",
     subtitle:
       "I rebuilt the Message Template card as a GenAI-first Chat Builder — the post-click surface in Ads Manager where CTM advertisers shape what people see after they tap.",
     company: "Meta",
-    year: "2024",
+    year: "2025",
     domains: ["AI"],
     bet: "The legacy Message Template card looked like a feature; operationally it was a bottleneck. Flat IA, manual copywriting, and zero guidance meant almost no one customized — and the org still had to fund a foundational fix.",
     metrics: [
@@ -52,7 +52,7 @@ export const briefs: EditorialBriefData[] = [
   {
     id: "inbox-ads",
     title: "Increasing ad creation from business inboxes",
-    subtitle: "Businesses use Instagram, Messenger, and WhatsApp to talk directly with their customers, but had no easy access to the best tool for getting more messages (messaging ads) from the place they actually spend their time.",
+    subtitle: "Businesses use Instagram, Messenger, and Meta Business Suite to talk directly with their customers, but had no easy access to the best tool for getting more messages (messaging ads) from the place they actually spend their time.",
     company: "Meta",
     year: "2022",
     domains: ["Monetization"],

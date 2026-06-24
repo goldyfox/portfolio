@@ -22,8 +22,24 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.lisaaufox.com"),
   title: "Lisa Aufox — Product Design",
-  description: "Portfolio of Lisa Aufox, product designer.",
+  description:
+    "Portfolio of Lisa Aufox, a product designer working at the intersection of AI, monetization, and messaging at Meta.",
+  openGraph: {
+    title: "Lisa Aufox — Product Design",
+    description:
+      "Portfolio of Lisa Aufox, a product designer working at the intersection of AI, monetization, and messaging at Meta.",
+    url: "/",
+    siteName: "Lisa Aufox",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lisa Aufox — Product Design",
+    description:
+      "Portfolio of Lisa Aufox, a product designer working at the intersection of AI, monetization, and messaging at Meta.",
+  },
 };
 
 export default function RootLayout({

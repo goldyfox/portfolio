@@ -4,6 +4,464 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ---
 
+## 2026-06-22 — Session 30: Inbox-ads homepage tile — interactive surfaces triptych
+
+### 18:40 — Inbox-ads tile: live triptych across IG / Messenger / MBS
+- Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (created), `app/page.tsx` (edited), `public/work/inbox-ads/screens/{instagram,messenger,mbs}.png` (added), `public/work/inbox-ads/logos/{instagram,messenger,meta}.svg` (added).
+- What: Replaced the static `cover.png` on the inbox-ads homepage tile with a live React component. Three real inbox frames (Instagram, Messenger, Meta Business Suite) sit side-by-side, each topped by its black-on-cream brand mark. On a self-looping cycle (reduced-motion holds the rest state) all three ad-creation entry glyphs light native blue (`#0A7CFF`) in unison — the IG "promote" arrow, the Messenger megaphone, the MBS megaphone chip. Glyphs are inline SVG pixel-matched to each frame's baked icon (`fade` mode fades a blue copy in over IG/MBS; Messenger `recolor`s grey→blue since its baked icon ships blue). Screens run off the bottom of the tile (top corners rounded `1.6cqw`, bottom square), which removes the bottom-nav noise.
+- Asset decisions:
+  - **Screens shipped as PNG, not the source SVGs.** Figma exported each frame as an SVG wrapping base64 bitmaps (IG = 24MB, Messenger 1.9MB, MBS 1.3MB — the avatars/photos are raster). PNG renders are pixel-identical at a fraction of the weight (~800KB total vs ~27MB). Rendered via headless Chrome at 2×.
+  - **Messenger frame cropped to full-bleed.** The source SVG baked a white device "card" with ~5.9% L/R, 2.4% top, 3.4% bottom padding + shadow. Cropped to box (50,42,799,1665) so the screen matches IG/MBS edge-to-edge. New aspect 749/1623.
+  - **Brand marks: dark grey (`#3A3A3C`), not black** (Lisa's call). IG + Meta from her Meta logo pack (black glyph SVGs, recoloured); Messenger only shipped mono as PNG/EPS, so rebuilt as a crisp vector (grey bubble + white knockout bolt). Meta `viewBox` trimmed from the 2504×2000 artboard to the symbol bounds. No text captions (Lisa: "hate the labels").
+  - **Virginia Rollison avatar = interim composite.** Her row in the MBS export has no profile photo (genuine gap in the Figma frame, not a render glitch — Aaron below renders fine). Composited a borrowed IG portrait, circular-masked, sized/placed to match the row's avatar column. **Authentic fix = re-export the MBS frame from Figma with her avatar, or drop in a real portrait.**
+- Icon alignment: measured each baked entry-icon center by pixel analysis — IG arrow (0.7665, 0.0807), Messenger megaphone (0.916, 0.0793 post-crop), MBS chip (0.770, 0.089). Glyph overlays positioned against the full (un-cropped) image so they stay locked to the baked icon.
+- Decisions: Tile is a real React component (matches FMUX/GenAI tiles), not an image. Self-loops; no orchestrator. `containerType: inline-size` + `cqw` units so it scales with the 16:9 tile.
+- Open: Virginia avatar is a placeholder pending Lisa's authentic asset. Live review of the loop/motion still pending.
+
+### 19:39 — Fix: Turbopack FATAL panic from in-project Chrome socket
+- Files: none (removed stray `.scratch/chrome` + `.scratch/chrome-shot` dirs; no source changes).
+- What: Dev server was 500-ing every route with "An unexpected Turbopack error occurred." Root cause was the headless-Chrome screenshot runs writing user-data-dirs **inside the project** (`.scratch/chrome*`), which contain a Unix socket file (`SingletonSocket`). Turbopack watches the whole tree and panicked reading the socket ("Operation not supported on socket, os error 102") during `globals.css` processing. Killed the chrome procs, removed the profile dirs; Turbopack re-watched and recovered (HTTP 200) with no restart. Component code was never at fault — the earlier `Sweep`/`ButtonIcon`/`ghostTabStyle` "not defined" lines were stale Fast-Refresh transients; all three are defined.
+- Decisions: **Never point a Chrome `--user-data-dir` inside the repo.** Future screenshots must use a temp dir outside the project (e.g. `/tmp` or `$TMPDIR`) so socket files never poison Turbopack's file watcher.
+
+### 19:55 — Inbox tile: alignment fixes + removed fabricated Virginia avatar
+- Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (edited), `public/work/inbox-ads/screens/mbs.png` (regenerated).
+- What:
+  1. **Messenger top alignment.** Card tops were misaligned because the three brand marks have different optical heights (IG 5.4, Messenger 6.2, MBS 4.6cqw) and each pushed its card down by its own height. Added a fixed `LOGO_BAND` (6.2cqw); logos are bottom-aligned within it, so every card top now starts at the same `TOP_PAD + LOGO_BAND + LOGO_GAP`.
+  2. **IG entry glyph alignment.** Pixel-measured the baked promote arrow in `instagram.png`: true center is `frac_x=0.7602` (was `0.7665`, ~1.6px too far right). Updated.
+  3. **Virginia Rollison avatar — fabrication removed.** Re-rendered the source `mbs.svg` at 4× and extracted all 15 embedded images. There are exactly three human portraits, and they belong to **Aaron Mitchell, Ana Thomas, and Meeta Vlachou** — Virginia's row has a genuinely empty avatar slot in the Figma export (likely a hidden/un-exported layer). The prior session composited a borrowed IG portrait as a stand-in; that was wrong. Regenerated `mbs.png` straight from source (no composite). Virginia's slot is now empty, matching the artifact.
+- Decisions: Do not fabricate identity assets. Source artifact is authoritative; an empty slot is shipped over a fake face.
+
+### 20:10 — Virginia avatar: real asset found + composited
+- Files: `public/work/inbox-ads/screens/mbs.png` (regenerated with real avatar).
+- What: Lisa pointed to the source — `~/Downloads/Mobile/Android/Threadlist Components/Android/Threadlist Components/Profile.svg` (her avatar wasn't in the MBS frame export, it was a separate component file). Extracted the embedded 500×500 photo + the Instagram badge glyph. Composited the circular photo (120px @2×) + IG badge into Virginia's row at `(46, 252.988)` in 375-space — same x and row pitch as the Aaron/Ana/Meeta avatars. The fabricated stand-in is fully gone; this is her genuine asset.
+- Decisions: Virginia avatar gap is **closed** with the authentic asset.
+
+### 20:20 — IG entry glyph: thickened blue to fully cover the baked arrow
+- Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (edited).
+- What: In `fade` mode the blue promote-arrow sits on top of the baked grey one. The baked icon is a heavier weight, so its arrowhead poked out behind the thinner blue glyph. Diagnosed by compositing the overlay over the real screen and zooming 4×. Fixed by dilating the 48px glyph alpha ~2px (re-embedded as the `ig-pano-i` PNG) and nudging the placement onto the arrowhead: `x 0.7602→0.762`, `y 0.0807→0.0824`, `w 0.07→0.073`. Blue now fully covers the grey without going chunky (a 3px dilation read as too fat).
+- Decisions: For `fade`-mode overlays, the blue glyph must be ≥ the baked icon's stroke weight, not just bbox — match weight, then position.
+
+### 16:56 — Back to Index buttons point to /index (was /)
+- Files: `components/portfolio/back-to-index.tsx` (edited).
+- What: The shared `BackToIndex` linked to `/` (homepage), but the work catalog lives at `/index`. Changed `href="/"` → `href="/index"`, fixing all four case studies that use it (inbox-ads, genai-conversations, journey-explorer, first-messaging-experience) in one place.
+- Note: `virtual-agent` uses a separate generic `BackButton` ("← Back", `router.back()` with `/` fallback), not a labeled Back-to-Index — left unchanged pending Lisa's call on whether to unify it.
+- Decisions: "Back to Index" = `/index`, not the homepage.
+
+### 21:05 — IG glyph: abandon overlay, erase baked arrow + recolor in place (right fix)
+- Files: `components/portfolio/home-ui/inbox-surfaces.tsx` (edited), `public/work/inbox-ads/screens/instagram.png` (edited).
+- What: The fade-on-top approach was fundamentally fragile — two slightly different arrow shapes never align, and thickening just made it chunky while grey still peeked. Switched IG to the **same mechanism Messenger/MBS use**: erased the baked grey arrow from `instagram.png` (filled the slot by copying the real background gradient row-by-row from a clean column so there's no flat-white seam against the callout-bubble shadow), then made our glyph the single source of truth — `recolor` mode, near-black (`#0A0A0A`) at rest to match the baked dots/compose icons, blue when lit. Restored the original (accurate-weight) glyph art; sized `w=0.06` to reproduce the native icon, centered at `(0.7602, 0.0816)`. Added optional per-surface `rest` color to the icon type.
+- Decisions: All three surfaces now use one consistent model — glyph IS the icon, recolored in place. No overlay-coverage hacks. When compositing onto a frame, sample the local background gradient, never flat-fill.
+
+## 2026-06-21 — Session 29: Homepage FMUX tile as a live Messenger animation
+
+### 15:57 — Inbox-ads: correct the three surfaces (WhatsApp → Meta Business Suite)
+- Files: `lib/content/briefs.ts` (edited).
+- What: The `inbox-ads` subtitle listed "Instagram, Messenger, and WhatsApp." The actual three surfaces are **Instagram, Messenger, and Meta Business Suite (MBS)** — corrected. Left the WhatsApp mentions in the GenAI case study (`app/index/genai-conversations/page.tsx`) untouched: those describe Meta's messaging-ads footprint, which genuinely includes WhatsApp, so they're accurate.
+- Decisions: Canonical inbox-ads trio = IG / Messenger / MBS (drives the upcoming triptych cover). WhatsApp belongs to the GenAI/messaging-ads story, not inbox-ads.
+
+### 15:42 — Title typography: decisions from the ligature follow-up (no code change)
+- Files: none (net-zero: briefly tried `tracking-[-0.01em]` on the FMUX hero, then reverted — any non-zero `letter-spacing` re-suppresses the `fi` ligature, so the FMUX hero stays untracked per 15:34).
+- Decisions:
+  - **FMUX hero title: keep at zero tracking** (ligature wins over tighter fit). To narrow it if ever needed, reduce font-size — never add tracking.
+  - **GenAI hero title keeps its `tracking-tight`** — Lisa's call (declined the consistency change). It has no `fi/fl/ff` combos ("Less work, better ads with generative AI."), so nothing's visibly suppressed there.
+  - **Both case-study hero titles share the same weight**: neither sets `font-weight`, so both inherit normal/400 Newsreader italic. (The `font-black` on the GenAI page is the decorative "96%" stat, not the title.)
+
+### 15:34 — FMUX case study: restore the fi ligature on the hero title
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Removed `tracking-tight` from both hero `h1` lines ("Unified first" / "messaging experience"). Non-zero `letter-spacing` was suppressing Newsreader's `fi` ligature, so "Unified"/"first" rendered as squeezed f+i (worse in italic). At natural spacing the ligature renders and the large display serif fits better.
+- Decisions: Display serif titles shouldn't carry negative tracking — it kills ligatures. Keep future big serif headings untracked.
+
+### 15:26 — GenAI card: longer dwell on the Recommended view
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: `HOLD_GENAI` 3000→6000ms (+3s) so the GenAI "Recommended template" state lingers before the loop resets to default.
+
+### 15:20 — GenAI card: load the real Optimistic font for the "Conversations" title
+- Files: `app/globals.css` (edited), `public/fonts/optimistic.ttf` (added).
+- What: The title's `fontFamily: DISPLAY` ("Optimistic Display") was silently falling back to SF because the font was never loaded. Found Meta's `OptimisticVF` (variable, wght 300–800) in `~/Downloads/Optimistic/optimistic.ttf`, copied it **unaltered** (license forbids modification — so no subsetting/woff2 conversion) to `public/fonts/`, and added a global `@font-face { font-family: "Optimistic Display"; font-weight: 300 800; src: .../optimistic.ttf }`. The "Conversations" span (weight 700) now renders in real Optimistic via the variable wght axis.
+- Decisions: Font shipped as `.ttf` (405KB) rather than woff2 to honor the "may not be altered" license. Loaded globally (not component-scoped) but only consumed by the GenAI tile's `DISPLAY` token. This is a deliberate authenticity exception to the Inter/Newsreader rule, same rationale as the Messenger/Ads-Manager UI fidelity.
+- Verified: font serves HTTP 200; title span confirmed using `DISPLAY`. Lint clean (only the pre-existing `@theme` Tailwind warning).
+
+### 15:13 — GenAI card: real Edit/Create-template button icons
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited), `public/work/genai/template/{pencil,plus}.svg` (added).
+- What: The Edit pencil was a hand-drawn approximation and both icons were undersized/off-center (the "+" was a faked text glyph with `lineHeight:0.8`). Copied the real `pencil.svg` + `plus.svg` (16×16 masked-PNG exports from the `→ 🟡 1` folder) and render them via a shared `ButtonIcon` `<img>` at `p(16)` with `display:block` so they center cleanly via the button's flex `alignItems:center`. Deleted the unused `PencilGlyph` SVG component.
+- Verified: Lisa confirmed live ("looks good"). Lint clean.
+
+### 15:09 — GenAI card: glimmer = faded gradient pulse, descender + panel padding fixes
+- Files: `components/portfolio/home-ui/genai-template.tsx`, `app/globals.css` (edited).
+- What (3 tweaks, batched):
+  1. **Loading glimmer redesigned.** Replaced the moving left→right white sweep with a static gradient fill — full skeleton colour (`#CBD2D9`) on the left fading to 10% (`${SKEL}1A`) on the right — that pulses in/out via `@keyframes genai-pulse` (opacity 1↔0.35, 1.4s ease-in-out). Swapped `genai-sweep`→`genai-pulse` in globals; renamed the `Sweep` component to `Glimmer`.
+  2. **"Greeting" descender clip.** The greeting skeleton bar started exactly where the "g" descender ends, so the solid bar clipped it. Gave `skeletonBar` an optional `topInset` and passed `p(4)` for the greeting bar only — clears the descender without moving the body text (so the greeting↔questions gap match holds).
+  3. **Padding below "Add responses."** Bumped the greeting/questions panel height `p(168)→p(172)` for ~4px more breathing room below "Add responses" (panel bottom still ~7px above the footer buttons).
+- Verified: lint clean. (Live screenshot captures were interrupted; changes are geometry-only.)
+
+### 01:14 — GenAI card: actually fix the clipped tab right padding (ghost measurer)
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: First attempt (RO on the inner span) still clipped — CDP measurement confirmed left pad 29px / right pad 4px. Root cause was a **ResizeObserver feedback loop**: the measured inner span lives *inside* the `overflow:hidden`, width-constrained pill, so the RO settled at the clipped width and dropped the right padding. Fixed by measuring a **hidden, out-of-flow ghost copy** of the label (absolutely positioned, `visibility:hidden`, never width-constrained) and driving the pill width from it. Extracted a shared `<TabLabel>` + `tabLabelStyle`/`ghostTabStyle` so the ghost and visible pill stay identical.
+- Verified (CDP, real time): pill grew 483→509px; left pad 29 / right pad 30 — symmetric. "AI" no longer touches the edge; "Saved templates" pushed out correctly. Lint clean.
+- Lesson: NEVER point a ResizeObserver at an element whose size is derived from the value the observer sets (here, an element inside an overflow-hidden box sized by the measurement). Measure an unconstrained ghost instead.
+- Note (tooling): `--virtual-time-budget` headless screenshots do NOT flush ResizeObserver callbacks (showed a stale/narrow pill). Drive Chrome over CDP (Node 24 built-in WebSocket) and wait real time for RO-dependent UI.
+
+### 00:52 — GenAI card: match the questions heading→body gap to the greeting
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: The "Questions and responses" → "1. Can I make a purchase?" gap read tighter than "Greeting" → body. Root cause: the greeting body span lives in a fade-layer with no explicit `font-size`, so it inherits a 16px line box and drops ~4px, while `QuestionList` sets its own 12px context and sits tight. Measured both renders (greeting gap ≈ 46px, questions ≈ 34px at 2×). Dropped the questions slot `p(80)→p(84)` and nudged "Add responses" `p(142)→p(146)` to keep the gap below. Re-measured: greeting 46px / questions 43px — matched.
+- Decisions: Left the greeting block untouched (Lisa likes its spacing); opened up questions to match rather than tightening greeting. The inherited-line-box inflation on greeting body is a known latent quirk, left as-is since it reads correctly.
+
+### 00:30 — GenAI card: exact fonts + 1:1 SVG coordinate mapping + real sparkle
+- Files: `components/portfolio/home-ui/genai-template.tsx` (rewritten), `public/work/genai/template/sparkle.svg` (added).
+- What: Text was still oversized. Lisa gave the exact type sizes; mapped the whole card 1:1 to the SVG. The card is now a fixed `428×382` box (`padding-bottom` aspect trick) with **every element absolutely positioned at its exact SVG coordinate** (header `(16,18)`, description `y46`, tabs `y100`, panel `(16,152) 396×168`, skeleton bars at panel-local `(8,30) 375×18` and `(8,80) 375×51`, buttons `y331`). Converted via `p(px)=px/428*100` cqw.
+  - Exact fonts: "Conversations" 16pt bold (Optimistic Display → SF fallback), description 14pt, Greeting/Questions headings 14pt bold, body 12pt — all SF Pro.
+  - Replaced the hand-drawn sparkle with the real asset (`sparkle.svg`, a #0A78BE-masked 12px icon from the `→ 🟡 1` export) in the "Recommended template ✦ AI" tab.
+- Decisions: Tab text 14pt (not given by Lisa; inferred — pill widths `167`/`232px` are consistent with 14pt). "Add responses" 13pt, buttons 13pt — also inferred, tunable. Check/pencil glyphs remain hand-drawn approximations (only the sparkle was called out).
+- Verified: lint clean, homepage 200, sparkle 200.
+
+### 00:15 — GenAI tile rebuilt as a real React component (replaces SVG cross-fade)
+- Files: `components/portfolio/home-ui/genai-template.tsx` (rewritten).
+- What: The SVG-cross-fade approach was a dead end — it can't morph the active tab, push the neighbor tab, or animate the skeleton smoothly, and the shimmer read as a static grey square. Discovered the card is the **Ads-Manager "Conversations" template** (not a Messenger chat). Rebuilt it as a faithful hand-coded React component (DOM, like FMUX). Renders the green-check header, subtitle, the two tabs, the greeting/questions panel, "Add responses", and Edit / + Create template buttons. Three animations: (1) active tab measures its content and animates `width` (`Suggested template` → `Recommended template ✦ AI`), pushing "Saved templates"; (2) a light band sweeps left→right across the two skeleton bars during glimmer; (3) greeting + questions cross-fade default → skeleton → GenAI.
+- Sizing: first React pass was ~30% too large (eyeballed cqw). Fixed by pulling exact geometry from the Figma export and converting **design-px → cqw via `p(px) = px/428*100`** (card is 428px wide). Verified against the export: tab pill `167→232×36`, panel `396×168 r4`, skeleton bars `h18`/`h51`, `16px` icons. Copy + palette (`#0A78BE` blue, `#E1EDF7` tab, `#F1F4F7` panel, `#1C2B33` ink, `#007E59` check, `#CBD2D9` skeleton) read from the SVGs.
+- Decisions:
+  - **GenAI tile is now a hand-built React component, not the SVG exports.** The 3 SVGs in `public/work/genai/template/` are no longer referenced by code (kept as visual reference / geometry source; safe to delete later).
+  - Font is SF Pro (system stack). Card sits on the `#EBF5FF` ground with `elevate` glow, same as FMUX.
+- Lesson (tooling): NEVER create a headless-Chrome `--user-data-dir` inside the workspace — its `SingletonSocket` makes the Turbopack dev server panic (`FATAL ... reading file .scratch/chrome/SingletonSocket`, os error 102) and the page 500s. Put Chrome profiles outside the repo (needs unsandboxed write) or skip headless screenshots.
+
+### 23:45 — GenAI homepage tile built (3-state message-template loop)
+- Files: `components/portfolio/home-ui/genai-template.tsx` (created), `public/work/genai/template/{default,glimmer,genai}.svg` (created — Figma exports), `app/globals.css` (edited — `@keyframes genai-shimmer`), `app/page.tsx` (edited — GenAI tile uses `<GenaiTemplate/>` + `elevate`).
+- What: Built the GenAI (L1 message-template) tile. A message-template card floats on a pale-blue ground (`#EBF5FF`, the icebreaker-pill blue) — it does NOT fill the tile (`padding: 8%` + `object-contain`). Cycles three pixel-perfect Figma SVG exports by cross-fading opacity: **default** (default welcome + icebreakers) → **glimmer** (loading) → **genai** (GenAI-written welcome + icebreakers) → reset → loop. Self-loops; `prefers-reduced-motion` holds the default state. Matches FMUX: `elevate` lifts it above the page grid with the subtle blue glow.
+- Shimmer (two wrong turns, then fixed):
+  1. First pass masked/pulsed the *whole* card — wrong, shimmered the avatar/header too.
+  2. Second pass embedded a gradient + CSS `@keyframes` inside `glimmer.svg` scoped to the two grey rects — but **CSS animations do NOT run inside `<img>`-loaded SVGs in Chrome** (only SMIL does), so it froze as a static grey square. Reverted the SVG to plain solid `#CBD2D9` rects.
+  3. **Final: shimmer driven in React.** A light band (`linear-gradient` white 0→0.85→0) sweeps left→right via `@keyframes genai-sweep` (`translateX(-100%→100%)`, 1.3s linear) inside two overlay boxes positioned over the exact skeleton-rect coords (as % of the 438×392 canvas: welcome `top 47.7% h 4.59%`, icebreakers `top 60.46% h 13.01%`, both `left 6.62% w 85.62%`). Card-wrap pinned to `aspect-ratio 438/392` with `objectFit:fill` so the overlays align to the SVG bars exactly. Overlays only render in the glimmer phase and respect reduced-motion. React side stays a 3-layer opacity cross-fade.
+- Lesson: don't rely on CSS keyframes inside `<img>` SVGs — drive motion in React/DOM (or inline the SVG / use SMIL).
+- Decisions:
+  - **Used the SVG exports directly (cross-fade), not a hand-rebuild.** Text is outlined to paths, images embedded — faithful and far simpler than rebuilding (FMUX only needed a rebuild because its motion was *inside* the UI). SF Pro noted but moot here (no live text).
+  - Tile keeps `aspect-square`. Glow + grid-lift via the existing `elevate` prop (pale-blue fill covers the prop's `bg-white`).
+- Open/tune: hold timings (default 2400 / glimmer 1900 / genai 3000ms), shimmer speed (1400ms), and the 8% inset are first-pass — adjust on screen. Verified: homepage 200, all three SVGs serve 200.
+
+### 23:01 — Noted: L1 redesign (GenAI tile) shimmer spec
+- Files: none (reference note for the upcoming GenAI tile build).
+- What: Captured the loading-glimmer spec for the GenAI / L1 redesign tile so it's ready when that tile is built. The default welcome message + icebreakers load behind a **shimmer/skeleton state** before swapping to the GenAI versions.
+- Decisions (refined after studying the source video):
+  - **Shimmer base color: `#CBD2D9`.**
+  - **Form: a React component — a *fixed* gradient rectangle, `100%` opacity on the left fading to ~`10%` opacity on the right. No horizontal travel.**
+  - **Animation: the whole block fades in and out (opacity pulse) to read as a shimmer.**
+  - Note: spec is Lisa's read of the video (her best guess), not pixel-confirmed — adjust during the GenAI build if it doesn't match once it's on screen.
+
+### 22:20 — FMUX tile: product-accurate reset + card lifted above the grid
+- Files: `components/portfolio/home-ui/fmux-chat.tsx` (edited), `components/portfolio/project-tile.tsx` (edited — added `elevate` prop), `app/page.tsx` (edited — FMUX tile gets `elevate`).
+- What:
+  1. **Reset animation no longer reverses.** Replaced the `sent`/`settled` booleans with a `Phase` state machine (`rest → fly → settle → fade → enterPrep → enter`). The sent bubble now **fades out in place** at the top (`fade`, opacity → 0, 320ms), then a fresh pill **snaps invisibly below its stack slot** (`enterPrep`, via a double-`requestAnimationFrame` so the browser paints the prep frame) and **slides up with a small overshoot bounce** (`enter`, `cubic-bezier(0.34,1.56,0.64,1)` 440ms) — matching the real product reset, not a rewind of the send.
+  2. **Card lifted above the page grid.** The `.grid-hydration` overlay is `position:fixed; z-index:1` and paints blue grid lines over everything, so it showed *through* the white chat. Added an `elevate` prop to `ProjectTile` that gives the media box `z-[2]` (above the grid), an opaque `bg-white` ground, and a subtle blue glow `box-shadow: 0 20px 50px rgba(19,19,236,0.1)`.
+- Decisions:
+  - Glow uses the brand atmospheric color (`rgba(19,19,236,…)`) but at `0.1` alpha instead of the DESIGN token's `0.05` — `0.05` was effectively invisible. Kept subtle so it doesn't bleed onto the title directly below. Dial back to `0.05` if it ever reads heavy.
+  - `elevate` is a reusable `ProjectTile` prop (not FMUX-only) so the GenAI/Inbox live tiles can opt in the same way.
+
+### 22:05 — FMUX tile rebuilt as hand-coded Messenger UI (replaces interim video)
+- Files: `components/portfolio/home-ui/fmux-chat.tsx` (created), `components/portfolio/project-tile.tsx` (edited — added `media` slot), `app/page.tsx` (edited — FMUX uses `<FmuxChat/>`), `public/work/fmux/chat/avatar.svg` (created — vector with embedded hi-res raster, replaces a low-res PNG).
+- What: Decided homepage tiles will be hand-built React/CSS components with bespoke per-project motion (not video loops or static screenshots). Built the FMUX tile as a Messenger thread, authentic to the Messenger design system: grey welcome bubble + avatar at top, three light-blue icebreaker pills anchored at the bottom above the composer. The top icebreaker ("Where are you located?") flies straight up and morphs into the solid-blue sent bubble, then settles with a "Sent" metatext — a 3-stage Smart Animate sequence read from Lisa's Figma prototype: (1) fly-up + recolor `cubic-bezier(1,0.01,0.03,0.04)` 400ms, (2) "After delay" 300ms pause just below final, (3) settle into place ease-in-out 300ms + "Sent" fades in. Self-loops; `prefers-reduced-motion` holds the resting state. Container-query (cqw) sizing keeps it proportional at any tile width (tile is fixed 4:5).
+- Exact values from Lisa's SVG exports (`new-sender.svg`, `icebreaker.svg`, `Sent.svg`): pill `#EBF5FF`, sent bubble + send icon `#0866FF` (real FB blue), ink `#080809`, fully-rounded pills. Send icon path inlined verbatim.
+- Decisions:
+  - Homepage tiles = live hand-built UI, animated as a sequential relay (one tile plays at a time, cycling 1→2→3→1) — orchestrator to be added once ≥2 tiles exist.
+  - Inside product-UI tiles, stay authentic to the source product (literal Messenger type/colors), NOT the portfolio brand tokens — explicit exception to the Azure Ethos brand-font/color rules for these depictions.
+  - Build order: FMUX first (GenAI deferred — L1 redesign Figma missing). GenAI and Inbox tiles still to do.
+- Open: full Messenger header (facebook bar + "Lucky Shrub" business header) seen in newer refs — not added; pending Lisa's call. Composer kept as icon-row (+/cam/img/mic/Aa) per her first Figma mock.
+
+## 2026-06-19 — Session 28: FMUX video labels + conclusion layout parity
+
+### Jun 21, 15:50 — Homepage tiles: video direction chosen; tile hardened for ambient loops
+- Files: `components/portfolio/tile-video.tsx` (created), `components/portfolio/project-tile.tsx` (edited), `app/page.tsx` (edited).
+- What: Explored a video-tile route (ref: itsmarga.me). Lisa's verdict: video is the direction, but it needs **purpose-built homepage loops with subtle/ambient motion** (so three autoplaying tiles don't overwhelm) — she'll author them. Added `TileVideo` client component: autoplay silent loop with `poster`, and a `prefers-reduced-motion` fallback that renders the poster still instead of playing. `ProjectTile` now takes `videoSrc` + `videoPoster` (video takes precedence over `coverSrc`, else cream placeholder). FMUX tile temporarily plays `flow-msgr-web.mp4` as an interim stand-in.
+- Decisions:
+  - **Homepage thumbnails = ambient video tiles** (Lisa authoring subtle homepage-specific cuts). Spec given: FMUX 4:5 1080×1350, GenAI 1:1 1080×1080, Inbox 16:9 1920×1080 (or keep cover); seamless-loop H.264/yuv420p MP4, no audio, <~2–3 MB each, + first-frame JPG poster. Drop at `public/work/<project>/home.mp4` + `home-poster.jpg`; wiring is one line per tile.
+  - **Accessibility:** reduced-motion users get the poster, never an autoplaying video.
+  - Inbox may stay a full-bleed cover image (mixed media is acceptable) if no subtle video is made for it.
+- Files: `components/portfolio/project-tile.tsx` (created), `app/page.tsx` (edited), `components/portfolio/architectural-card.tsx` (deleted), `public/work/home/brutalist-bg.png` (deleted).
+- What: Replaced the homepage's empty placeholder cards with a `ProjectTile` system. First attempt — a generated brutalist-concrete duotone background with a screenshot seated in the niche — was **rejected by Lisa as "AI slop."** Removed it entirely (component + generated image). New direction: each card is a **full-bleed designed cover photo** (`object-cover`, subtle hover zoom, no blue ground). Inbox Ads uses its existing `cover.png` (already a polished multi-device gradient cover). FMUX + GenAI show clean cream interim placeholders (serif title only) until Lisa authors matching covers.
+- Decisions:
+  - **NO AI-generated imagery for project thumbnails.** Generated photographic backgrounds read as slop. Lesson: cohesion comes from real assets + a consistent treatment, not invented art.
+  - **Cover photos are Lisa's to make** (Figma — real UI in device mockups on the brand gradient). Targets: `public/work/fmux/cover.png` (~1600×2000, 4:5), `public/work/genai/cover.png` (~2000×2000, 1:1). Inbox already done. Wiring is a one-line `coverSrc` change per card once she drops them in.
+  - `ProjectTile` renders full-bleed cover when `coverSrc` is set, else a cream serif-title placeholder. Keeps the asymmetric grid (4:5 / 1:1 / 16:9).
+
+### Jun 20, 17:10 — Fixed the two publish caveats (contact sender + real OG card)
+- Files: `app/api/contact/route.ts` (edited), `app/opengraph-image.tsx` (created), `app/layout.tsx` (edited), `assets/fonts/*.woff` (3 added).
+- What:
+  1. **Contact sender moved off Resend's test address.** `from` is now `Lisa Aufox Portfolio <noreply@lisaaufox.com>` (env-overridable via `CONTACT_FROM_EMAIL`); recipient is env-overridable via `CONTACT_TO_EMAIL` (default `lisaaufox@gmail.com`). Code is production-ready.
+  2. **Real 1200×630 OG share card.** Added `app/opengraph-image.tsx` using `next/og` `ImageResponse` — renders JSX → crisp PNG at build (verified static `○ /opengraph-image`, 1200×630). On-brand: cream ground, ethos-blue Newsreader-italic "Lisa Aufox", Inter "PRODUCT DESIGN" label, "PORTFOLIO" eyebrow, azure-halo radial glow, `lisaaufox.com`. Brand fonts loaded from `assets/fonts/` (Newsreader 500 italic + Inter 500, `.woff` from Fontsource — satori supports woff, not woff2). Removed the `about-panel.png` placeholder `images` from `openGraph`/`twitter` in `layout.tsx`; the file convention is now the single source for `og:image` (X/Twitter falls back to it).
+- Decisions:
+  - **OG card is generated, not a static asset** — text stays crisp and editable in code (avoids garbled AI-image text). Fonts live in `assets/fonts/` (outside `public/`, read via `fs` at build only).
+  - **MANUAL STEP STILL REQUIRED (not code):** the `lisaaufox.com` domain must be verified in the Resend dashboard (add the DNS records Resend provides) before `noreply@lisaaufox.com` will send. Until then, set `CONTACT_FROM_EMAIL` back to `onboarding@resend.dev` or complete verification. `RESEND_API_KEY` must also be set in the host env.
+
+### Jun 20, 16:53 — Publish-readiness fixes (homepage links, doodles, contact, SEO, cleanup)
+- Files: `app/page.tsx`, `lib/content/briefs.ts`, `lib/content/catalog.ts`, `app/contact/page.tsx`, `app/api/contact/route.ts`, `app/layout.tsx`, `app/doodles/page.tsx` (all edited); `components/portfolio/editorial-brief.tsx`, `components/portfolio/brief-preview.tsx`, `app/archive/` (deleted); `components/portfolio/index.ts` (edited); `public/work/fmux/{err.log,flow-bottomsheet.mov,flow-msgr.mov,flow-msgr-sdr.mp4}` (deleted); `public/doodles/*.webp` (5 added). Followed a full-site publish-readiness audit.
+- What:
+  1. **Homepage link bug fixed** — `app/page.tsx` destructured `[flow75, inbox, je]` but FMUX had been prepended to `briefs`, so every card linked to the wrong case study. Renamed to `[fmux, genai, inbox]` and pointed each card at its own page (FMUX→first-messaging-experience, GenAI→genai-conversations, inbox→inbox-ads). Homepage now features those three, each linking correctly.
+  2. **Doodles page is now real** — scraped 5 full-res images from lisaaufox.com/doodles (Squarespace CDN; served as WebP at `?format=2500w`, renamed `.webp`), saved to `public/doodles/`, rendered as a 2-col `next/image` gallery with the site's grayscale→color + 1.03 hover.
+  3. **Contact form** — recipient `lisa.aufox@gmail.com` → `lisaaufox@gmail.com`; greatly expanded captured metadata (viewport, DPR, language(s), platform, device memory, CPU cores, touch points, connection type, cookies, DNT, color-scheme, reduced-motion, client referrer, page URL) on top of the existing IP/UA/headers/timezone/screen/time-on-page.
+  4. **SEO/social** — added `metadataBase` (https://www.lisaaufox.com), Open Graph, and Twitter/X card metadata in `app/layout.tsx` (share image = `about-panel.png` for now).
+  5. **Asset cleanup** — removed `err.log` + 3 unreferenced FMUX videos (`flow-bottomsheet.mov`, `flow-msgr.mov`, `flow-msgr-sdr.mp4`). Verified the used ones first: `icebreaker-curved-intro.mov`, `flow-msgr-web.mp4`, `flow-bottomsheet-sdr.mp4` kept.
+  6. GenAI brief year 2024 → **2025** (matches catalog).
+  7. FMUX catalog summary rewritten to match the real project (icebreaker redesign, not the old "chat component" blurb).
+  8. FMUX brief metric `TBD` → **+0.40%** CTR lift.
+  9. Deleted empty `app/archive/` dir + orphaned `EditorialBrief`/`BriefPreview` components (verified zero imports; removed their barrel exports). `MetricsRow` + `EditorialBriefData` type kept (still referenced).
+  10. FMUX headers: verified all section headers are already `font-serif italic` — no change needed.
+- Decisions:
+  - **Homepage features 3 projects (FMUX, GenAI, inbox-ads).** If a different set/order is wanted, change the destructure + card props together.
+  - **Doodles use grayscale→color hover** per `DESIGN.md` image rule, for gallery cohesion. Easy to switch to full-color-at-rest if preferred.
+  - **CAVEAT — contact sender still `onboarding@resend.dev`** (Resend test address). Delivery to `lisaaufox@gmail.com` only works if that's the verified Resend account owner; a verified sending domain is still needed for robust prod deliverability. `RESEND_API_KEY` must be set in the host env (not just `.env.local`).
+  - **OG image is a placeholder** (`about-panel.png`, 1024×720). A purpose-built 1200×630 share card would be better. `metadataBase` assumes the deploy domain is www.lisaaufox.com.
+
+### Jun 20, 16:31 — Archived orphaned genai1 / genai2 route pages
+- Files: `app/index/genai1/page.tsx` → `archive/genai1/page.tsx` (moved), `app/index/genai2/page.tsx` → `archive/genai2/page.tsx` (moved).
+- What: Moved the two orphaned GenAI draft-variant pages out of the routed `app/` tree into a top-level `archive/` folder. Both pages only rendered the `genai-conversations` brief and were not linked from anywhere (homepage `app/page.tsx` links only `/index/genai-conversations`; catalog has only the `genai-conversations` slug; no `href` anywhere targets genai1/genai2). Routes `/index/genai1` and `/index/genai2` no longer exist. `genai-conversations` remains the single live GenAI case study.
+- Decisions:
+  - **"Archive" = move out of `app/`, don't delete.** Code is preserved in `archive/` (dormant, not routed, `@/` imports still resolve from project root) so the layout variants can be referenced/restored later. If a future session wants them fully gone, delete `archive/genai1` + `archive/genai2`.
+  - Confirmed via grep that genai1/genai2 had zero inbound links before moving — safe, no broken references.
+
+### Jun 20, 16:27 — Sentence-case sweep across all project titles
+- Files: `lib/content/briefs.ts`, `lib/content/catalog.ts`, `app/index/first-messaging-experience/page.tsx`, `app/index/genai-conversations/page.tsx`, `app/index/genai2/page.tsx`, `app/index/genai1/page.tsx` (all edited).
+- What: Normalized every project title to sentence case (was mixed). Data titles: "AI Agents in Messaging Ads"→"AI agents in messaging ads", "Unified First Messaging Experience"→"Unified first messaging experience" (briefs + catalog), "Less Work, Better Ads with Generative AI"→"Less work, better ads with generative AI" (briefs + catalog). Hardcoded hero headlines: FMUX "Unified first / messaging experience"; genai-conversations + genai2 "Less work, better ads / with generative AI."; genai1 "The creator-to-reviewer shift." Acronyms/proper nouns kept caps (AI, Reels, Autodesk). inbox-ads/virtual-agent/journey-explorer render `{brief.title}` so they inherited the fix.
+- Decisions:
+  - **Site-wide title convention is SENTENCE CASE** (acronyms + proper nouns excepted). Supersedes the earlier Title-Case FMUX title decision from 12:24. Apply sentence case to any new project title.
+
+### Jun 20, 12:24 — Case-study title → "Unified First Messaging Experience"
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `lib/content/briefs.ts` (edited).
+- What: Retitled the case study. Iterated hero headline "…in Messenger" → "…on Messenger and Facebook" (to reflect cross-platform scope) → then Lisa landed on **"Unified First Messaging Experience"** (the project's real name, FMUX, with "Unified" carrying the outcome). Hero h1 split as "Unified First / Messaging Experience"; subhead "The $10M redesign." unchanged. Updated `brief.title` to match so the browser tab, sticky scroll-spy title, and index cards are all consistent (resolves the earlier open question about `brief.title` still saying "in Messenger").
+- Decisions:
+  - **Don't put $10M/revenue in the headline** — it's already the adjacent subhead; "Unified" carries the design-win half, "$10M" the money half.
+  - **Title updated on ALL surfaces** to the identical string: hero h1 (`page.tsx`), `brief.title` (`briefs.ts` → tab + scroll-spy + index/home cards), and the catalog row (`catalog.ts`). Confirmed no other hardcoded "First messaging experience in Messenger" references remain outside docs.
+  - **Title Case is intentional** for this title (reads as the proper FMUX product name). Most other brief/catalog titles are sentence case (catalog was explicitly standardized to sentence case in an earlier session); flagged to Lisa, pending her call on whether to match sentence case. NOTE: if she chooses sentence case, change all three surfaces together.
+
+### 21:05 — Problem section copy polish pass (batched)
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: A series of small copy/punctuation edits to the Problem & Constraints (curved-text) section: P1 em-dashes → parentheses ("Icebreakers (…) existed on two surfaces"); clarified "while Facebook's bottom sheet" then de-duped by changing P2's opener to "The bottom sheet"; P2 dash → colon and reworded the second clause so there's only one colon ("visually dated: …; Messenger looked sleeker, with …"); P4 "right-aligned pills / sent message" → "centered pills, with no icon to signal they could be tapped" then "looking less like a tappable prompt" (rejected) — final is the "no icon to signal they could be tapped" version; removed duplicate "small affordance" from P5 → "a visual cue doing most of the work"; P5 experiment line → "tested both within an updated visual system."
+- Decisions:
+  - **"Facebook's bottom sheet" now appears once per relevant paragraph max** — watch for it recurring across P1–P3.
+  - **Two em-dashes INTENTIONALLY KEPT** (P4 "send" icon —, P5 "the opposite —") — Lisa's call. Down from one per paragraph; two across the whole section is natural usage, not AI-marker overuse. Do NOT "fix" these in a future pass. All other dashes in the section were converted to colons/parens/commas.
+
+### 20:48 — Before states copy corrected against screenshots + Winner pill final
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Rewrote the Before states intro to explain the actual UI differences (Lisa's copy). Winner pill finalized as solid `bg-ethos-blue text-ethos-cream` bold (tried white-outline + light-blue; blue won for legibility).
+- **CANONICAL before-state facts (verified by opening `fb-before.png` / `msgr-before.png`):**
+  - **Facebook bottom sheet:** icebreakers are a **static list** of full-width rows, left-aligned text, each with a blue **send icon**, hairline dividers between. Lets users tap several messages to send. (NOT an "overlay".)
+  - **Messenger:** icebreakers are **centered white pills** (white bg, blue text) at the bottom of the thread, **no icon**, dismisses all options after tapping one. (NOT "right-aligned".)
+- Decisions / lessons:
+  - **REPEAT FAILURE of editing-discipline #1** (look at the artifact before describing it). I described the before-states from memory and got both wrong ("overlay", "right-aligned pills"); Lisa caught it — second time this exact class of error (cf. pill provenance). Always open the screenshot before writing UI descriptions.
+  - **RESOLVED — Problem P4:** Lisa confirmed centered is correct. Changed P4 "right-aligned pills... closer to a message you'd already sent" → "centered pills with no icon, reading more like static suggestions than a prompt you could tap" (the "sent message" logic depended on right-alignment, so it was replaced, not just the alignment word).
+
+### 20:19 — Case-study arc review fixes: Winner pill + trimmed Before states intro
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: After a full-page arc review, applied two fixes. (1) Added a solid `bg-ethos-blue text-ethos-cream` "Winner" pill below the Variant A hairline in The Experiment, so the experiment's result is legible on-page (it previously never stated which variant won). (2) Trimmed the redundant Before states intro (it restated the FB-vs-Messenger performance puzzle a third time after the hero + Problem section) down to one orienting line: "Two surfaces, two executions, and as the data showed, very different results."
+- Decisions:
+  - **Result-early is intentional, NOT a spoiler.** Lisa overruled the suggestion to move "Messenger, redesigned" after "The Experiment." Recruiters skim and bail, so leading with the shipped result is deliberate BLUF. Don't reorder these.
+  - **Winner pill uses `rounded-full`** — on a badge this short the radius lands ~at the 10px `DESIGN.md` cap; kept as a pill (thematically apt for an icebreaker-pill case). Switch to `rounded-[8px]` if strict compliance is wanted.
+  - Before states intro: chose the version that keeps a thread of performance tension but dropped the em-dash (comma instead) per the standing no-em-dash rule.
+- Open (from arc review, not yet done): em-dashes still in hero intro + Problem P4/P5; title "in Messenger" undersells cross-platform scope; 3 header treatments vary; stray double-space in Problem P1; long hero Outcome sentence.
+
+### 19:54 — Replaced blue Outcome box with full-width Impact metrics section
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Removed the blue `bg-ethos-blue/5` Outcome box from inside the Conclusion lockup. Added a full-width **Impact** section above the Conclusion using the shared `AnimateMetrics` component (count-up grid used by inbox-ads etc.), `grid-cols-3`: +$10M Incremental revenue / +0.40% CTR (SS+) / +0.25% Conversions (SS+). Conclusion lockup is now just the two-part narrative (left) + video (right). Order: Design Principles → Impact → Conclusion.
+- Decisions:
+  - **Metrics now use the cross-study `AnimateMetrics` pattern** instead of a one-off card, for consistency with other case studies.
+  - **Impact header = other-projects small-label treatment** (left-aligned, `text-[11px] uppercase tracking-[0.1em]`, `border-b border-ethos-blue/30`) but with `font-serif italic` instead of `font-sans` per Lisa — she wanted the layout to match other pages and only the font family changed. Don't re-center it or swap the hairline.
+
+### 19:51 — Conclusion Outcome metrics filled + $10M validated
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Filled the conclusion Outcome box (was TBD): **Incremental revenue +$10M**, **Conversion rate (SS+) +0.25%**, **CTR (SS+) +0.40%**. Renamed "Conclusion" from "What shipped" earlier; this fills its metrics. Verified Meta FY2025 reported revenue (SEC/press release, reported Jan 28 2026): ad revenue **$196.175B**, total revenue **$200.966B**.
+- Decisions:
+  - **SENSITIVE DATA — do NOT put the raw revenue-lift percentage (the +0.0036% figure) in any page copy.** Lisa flagged it as sensitive. Show the dollar figure ($10M) only. The 0.0036% × $196.175B ≈ $7.06M math is for internal validation, not for the site.
+  - **$10M stays everywhere** (hero "The $10M redesign" subhead + hero Outcome line). On the latest reported numbers the +0.0036% formula yields ~$7M, but Lisa chose to keep $10M (different/projected base she holds). Don't "correct" $10M to $7M in future passes.
+  - Conversion rate and CTR percentages (SS+) are fine to display; only the revenue-lift % is sensitive.
+
+### 19:37 — Conclusion copy rewrite + What shipped / Principles header & border changes
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Replaced the three "What shipped" conclusion paragraphs with Lisa's two-paragraph close (the designer's-dilemma arc: hard to fund a redesign vs. a net-new component → this project sat handoff-ready 6 months until a second project unlocked eng investment → "a redesign alone could drive incremental ads revenue, I wasn't"). Header changes: "What shipped" title is centered + underlined (matching "Messenger, redesigned") but its top hairline was removed per Lisa. Design Principles: restored its shimmer-line headline hairline (briefly removed by mistake) and bumped the full-bleed section's top/bottom frame from `border-ethos-blue/10` → full `border-ethos-blue` so the cream band's borders are actually visible.
+- Decisions:
+  - **Conclusion voice:** Lisa rejected an AI-polished rewrite ("not my voice"). Lesson reinforced — when she hands over a draft to "workshop," fix grammar/typos and lightly tighten only; do not restructure, swap idioms, or strip her phrasing ("designer-driven initiative", "firm believer"). Final copy is hers verbatim.
+
+### 18:42 — Design Principles copy rewrite (all three) + I renamed
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Replaced all three Design Principle paragraphs with Lisa's rewritten copy and renamed Principle I "Design as a revenue lever" → **"Interaction drives revenue"** (better fits the icon-affordance argument). I: send-icon hypothesis vs. design leadership, tested both. II: replacing the one-off Messenger pill with a net-new primary/secondary component + Facebook 1:1-render framing (trimmed a redundant "gaining approvals from all surface owners" tail). III: preserving multi-send on the bottom sheet via an animated re-ordering interaction. Also removed "interaction" from the Experiment intro ("two patterns" — same interaction, different visual treatment).
+- Decisions:
+  - Fixed only clear typos in pasted copy (preferrable→preferable, arguements→arguments, "the the"→"with the", Messnger→Messenger); preserved Lisa's wording otherwise.
+  - Avoided animate/animation repetition in III by using "animated tap interaction" once then "slide into a re-ordered list."
+
+### 18:19 — Design Principles hairline width aligned to content shell
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: The full-bleed Design Principles section was re-padding with a hardcoded `1.5rem` and capping inner content at `max-w-7xl` (80rem), so its hairline/headline was both narrower and ~1rem offset from neighboring sections (which sit in `SITE_CONTENT_SHELL` = `max-w-[100rem]`, `px-10` at desktop). Replaced the manual `paddingLeft/Right` calc + `max-w-7xl mx-auto` inner wrapper with `SITE_CONTENT_SHELL`, and dropped the now-redundant `px`/`-mx` classes (inline `margin` full-bleed math is unchanged). Hairline now lines up edge-to-edge with the rest of the page; cream background still bleeds full width.
+- Decisions:
+  - **Full-bleed sections must align inner content with `SITE_CONTENT_SHELL`**, not a hand-rolled max-width + padding. Keeps section edges consistent at every breakpoint.
+
+### 18:13 — Video labels + conclusion mirrors "Messenger, redesigned"
+- Files: `components/portfolio/unified-flow-section.tsx` (edited), `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Added an optional `videoLabel` prop to `UnifiedFlowSection`, rendered as a centered uppercase micro-caption (`text-[11px] tracking-[0.2em] text-gray-500`) above the portrait video — same style as the before/experiment screenshot captions. Messenger video labeled "Messenger"; bottom-sheet (conclusion) video labeled "FB bottom sheet with multi-tap". Then restructured the "What shipped" conclusion to use the same centered flex lockup as "Messenger, redesigned" (`min-[975px]:flex-row items-start justify-center gap-20`), but as a true mirror: the full text column (three conclusion paragraphs + Outcome box) in a `max-w-md` sticky column (`self-start sticky top-32`) on the LEFT, video in a `shrink-0` block with label on the RIGHT. Paragraphs were moved out of a separate full-width `max-w-3xl` block into the lockup so the text top-aligns with the video (matching how "Messenger, redesigned" keeps synthesis copy + metrics together beside the video). `order` utilities keep the video stacked first on mobile.
+- Decisions:
+  - **Conclusion mirrors "Messenger, redesigned"** — same lockup mechanics, reversed sides (text left / video right vs. video left / text right). Bottom-sheet video keeps its 30px corner radius (Messenger is 25px) per Lisa's earlier choices — not unified.
+
+---
+
+## 2026-06-18 — Session 27: FMUX team line + cross-study label consistency
+
+### 13:56 — FMUX team line + Role normalization across case studies
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `app/index/inbox-ads/page.tsx` (edited).
+- What: FMUX hero Team line set to **"2 product designers, 3 engineers, 0 PMs"** — matches the `N role, N role, 0 PMs` count format used by GenAI / GenAI2 (`4 product designers, 3 engineers, 1 data scientist, 0 PMs`). The `0 PMs` phrasing (not "no PM") is the canonical form; it's a deliberate point, not an omission.
+- **Cross-study Role normalization:** `inbox-ads` said "Design Lead" — every other study uses **"Lead designer"** (Lead first, lowercase designer). Normalized inbox-ads to match. Meaningful role extensions left intact: `genai-conversations` "Lead designer, project owner", `virtual-agent` "Lead designer & researcher".
+- Decisions:
+  - **Canonical hero labels/values:** Role = "Lead designer" (+ optional ", role" extension); Team = count format ending in "0 PMs"; labels are Role / Team / Surfaces / Outcome.
+  - **`virtual-agent` Team stays prose** ("Cross-functional core pod spanning...") per Lisa — that project's team was genuinely fuzzy, so it's intentionally not forced into the count format. (Note for a future pass: "cross-functional" trips the voice rule's resume-speak flag if it ever gets reworded.)
+
+### 22:53 — FMUX "Messenger, redesigned" video: clean SDR source + rounded corners
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `components/portfolio/unified-flow-section.tsx` (edited), `public/work/fmux/flow-msgr-web.mp4` (created).
+- What: The grey/washed-out video was a true HDR (BT.2020/PQ) source export; tone-mapping the HDR `.mov` never fully recovered color. Swapped to `NewIBs-MSGR.mov` from Drive, which is already H.264 / yuv420p / BT.709 SDR. Remuxed it losslessly (`-c:v copy -movflags +faststart`) to `flow-msgr-web.mp4` — no re-encode, browser-safe container. Set the portrait video clip-path to `inset(2px round 25px)` — the rounded clip also eats the black device-corner pixels from the recording. Then fixed the section layout: it was an 8/4 column split with the narrow portrait video shoved to one edge, pooling all whitespace into a dead gap in the middle (NN/Gestalt proximity violation). Re-aligned to the proven "What shipped" pattern on the same page — 7/5 split, video centered in its column, `items-center` for vertical centering — so whitespace balances on both sides of the video.
+- Decisions:
+  - **Root cause of grey video = HDR source, not codec or caching.** Always confirm a recording is SDR (BT.709) at export; an SDR source remuxed to mp4 needs no tone-mapping.
+  - **25px corner radius exceeds the `docs/DESIGN.md` 10px cap** — applied at Lisa's explicit request to crop the black screen-corners and mimic a phone-screen radius. Flagged; left in place per Lisa.
+  - **Portrait `UnifiedFlowSection` now mirrors the `What shipped` layout** (7/5, centered, items-center). Don't reintroduce wide column spans for narrow portrait media — it creates proximity gaps.
+  - **Bottom-sheet "What shipped" video still has only an HDR source** (`FMUX-Bottomsheet.mov`) — needs an SDR re-export or tonemap retry. Open.
+
+### 16:50 — FMUX portrait lockup, header, and edge-case relocation
+
+- Files: `components/portfolio/unified-flow-section.tsx` (edited), `app/index/first-messaging-experience/page.tsx` (edited).
+- What:
+  - **"Messenger, redesigned" lockup:** the 12-col grid pinned the text to the far-right edge, so a narrow portrait video always left a dead gap in the middle (proximity violation). Rebuilt the portrait branch as a flex pair — video + `max-w-md` text with an 80px gutter, top-aligned, then `justify-center` to center the whole lockup as a unit. Non-portrait usage still uses the original grid.
+  - **Section header:** centered "Messenger, redesigned" and switched it to `text-ethos-blue` to match the other section headers (`px-12` so the underline is symmetric). `UnifiedFlowSection` is FMUX-only, so this is safe.
+  - **Variant B caption:** "Text-only, cleaner but less discoverable." → "Text only, cleaner but similar to a sent message."
+  - **Edge case relocated:** moved the "Multi-tap on bottom sheet" block out of The Experiment and into the "What shipped" text column, beside the bottom-sheet video — the surface the behavior actually belongs to.
+- Decisions: For narrow portrait media, use a centered flex lockup, not a wide-column grid. Captions/edge cases live next to the surface they describe.
+
+### 17:12 — FMUX "What changed" + hero outcome copy
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `components/portfolio/unified-flow-section.tsx` (edited).
+- What:
+  - Relabeled the redesign block's sub-heading from "Synthesis" → "What changed" (it's a redesign reveal, not a synthesis).
+  - Removed the metrics grid and Surfaces tags from that block — `metrics` is now an optional prop on `UnifiedFlowSection` and both metrics/tags render conditionally.
+  - Rewrote the "What changed" copy several times for voice/cohesion. Final: "The redesign extended Messenger's design system with a secondary pill variant. New type, spacing, color, and tap animations. The old white pills looked pasted on top of the thread; the new ones sit on the right, in the sender's side of the conversation, where a reply belongs. It's the best of both originals: Messenger's polish plus the send icon that drives revenue."
+  - Hero Outcome line set to: "Shipped a unified icebreaker UI based on Messenger's design system across both Messenger and Facebook, incorporating new motion patterns, for a $10M incremental revenue gain."
+- Decisions:
+  - **`UnifiedFlowSection` is FMUX-only**, so trimming metrics/tags to optional is safe.
+  - **Open voice/structure flag:** the "What changed" block sits *above* "The Experiment," yet its last line ("send icon that drives revenue") states the experiment's payoff. Left in at Lisa's direction as a teaser; revisit if it reads as a spoiler.
+
+### 17:21 — Editing-discipline rule + corrected element attribution
+
+- Files: `.cursor/rules/editing-discipline.mdc` (created), `app/index/first-messaging-experience/page.tsx` (edited).
+- What:
+  - After a long copy back-and-forth, captured 5 working-discipline lessons as an always-apply rule: (1) look at the artifact before inferring, (2) edit in full context not line-by-line, (3) don't ship regressions while polishing, (4) accurate facts beat good prose, (5) don't re-litigate settled decisions.
+  - **Verified element attribution from the before screenshots** (should have done this first): `fb-before.png` = Facebook bottom sheet uses a **list** of rows, each with a **send icon**; `msgr-before.png` = Messenger uses **white pills**, no send icon. So the redesign kept the **pill from Messenger** and the **send icon from the Facebook bottom sheet**. Corrected the "What changed" close accordingly and removed a false "a plain list reads as static text" line (the list was the better-performing bottom sheet).
+- Decisions:
+  - **Canonical FMUX element provenance:** tappable pill = Messenger; send icon = Facebook bottom sheet. Don't reverse this in future copy.
+  - **Possible follow-up:** the Problem section's "Messenger looked like static text" framing is slightly off vs. the screenshots (Messenger pills read like already-sent bubbles, not static text). Not changed yet — flagged for Lisa.
+
+### 17:27 — Problem-section accuracy fix, type bump, sticky "What changed"
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `components/portfolio/unified-flow-section.tsx` (edited).
+- What:
+  - **Problem section accuracy:** replaced "Messenger icebreakers looked more like static text, not an interactive element" with the screenshot-accurate "Messenger showed them as right-aligned pills with no icon, closer to a message you'd already sent than a prompt you could tap."
+  - **Body type bump:** "What changed" synthesis copy and "Before states" intro both bumped `text-base` → `text-lg` (16px → 18px) to match the page's body standard.
+  - **Sticky "What changed":** gave the portrait text column the same sticky behavior as Before states (`min-[975px]:sticky top-32 self-start`). Required removing `overflow-hidden` from the `UnifiedFlowSection` `<section>` — any clipping ancestor disables `position: sticky` on descendants. The video crops via `clip-path`, so nothing relied on the overflow clip.
+- Decisions:
+  - **`overflow-hidden` + `position: sticky` are incompatible** — don't put `overflow-hidden` on a section that needs a sticky child.
+  - Pre-existing em-dashes remain on lines ~114 and ~122 of the Problem paragraph — flagged to Lisa, not changed unasked.
+
+### 17:45 — Suggested-messages pulled into the conclusion; new project-momentum story
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What:
+  - Removed Design Decisions card III ("Suggested messages") and dropped that grid from 3 columns to 2 (now just Animation patterns + Messenger system fit, the two genuine decisions).
+  - Rewrote the **What shipped** conclusion: replaced the short col-5 intro paragraph with a full-width `max-w-3xl` three-paragraph narrative that finally tells the project-momentum story: the redesign sat handoff-ready ~6 months before eng built the component and ran the experiment; extending the pill pattern beyond the first consumer↔business exchange (into consumer suggested messages) opened a large enough opportunity to justify the build; Lisa predicted the icebreaker redesign alone would drive revenue and it surprised the engineers ("Design win"). Grid below keeps Outcome box + Edge case beside the bottom-sheet video.
+- Decisions:
+  - **Suggested messages is a project-justification beat, not a design decision** — it belongs in the conclusion narrative, not the Design Decisions list.
+  - Type/voice: full-width narrative matches the Problem/Experiment intro pattern (`max-w-3xl`, `text-lg text-gray-600`); no em-dashes; no "But/And" sentence openers.
+  - **Flag:** with this added, the Problem section (5 paragraphs) + this conclusion makes the page text-heavy overall. Lisa noted the intro is heavy; a future pass may trim the Problem section for balance.
+
+### 18:05 — Design Decisions section overhaul (real tradeoffs)
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Replaced the "robotic, infrastructure-listing" Design Decisions cards (Animation patterns / Messenger system fit / Suggested messages) with three real tradeoffs sourced from Lisa, each framed tension → call → cost:
+  - **I. The send icon** — leadership wanted it removed (visual noise) vs. Lisa's read that it was the tappability signal/revenue lever. Resolved by testing both in the experiment instead of by seniority.
+  - **II. A net-new component** (the staff-level beat) — the OLD icebreaker pill (white background, blue text) only existed for icebreakers and was never integrated into the design system. That was the opening to argue for replacing the one-off outright with a net-new design → primary + secondary variants, reusable (e.g. consumer suggested messages), optional icon. The **light-blue secondary pill** is the net-new result. Won over Messenger design-system owners. Facebook wrinkle solved by framing the bottom sheet as a 1:1 render of Messenger, not native FB UI.
+  - **III. Multi-send** — data showed multi-send on the bottom sheet drove revenue, so the redesign preserved it via a designed interaction (tap one, remaining options animate into a re-ordered list). Corrects the earlier "open question" framing.
+  - Restored the grid to 3 columns; removed the now-redundant "Edge case: Multi-tap" block from the conclusion (card III supersedes it).
+- Decisions:
+  - **Canonical pill provenance:** OLD Messenger icebreaker pill = white background, blue text (the un-systematized one-off). REDESIGN pill = light-blue background, dark text, blue send icon (the net-new secondary variant that replaced it). Verified the redesign pill color via `variant-a-msgr.png`. Don't reverse these.
+  - **Design Decisions now operate at a higher altitude** (alignment/governance/politics), per Lisa: the hard part at Meta was getting alignment to ship, not drawing the pill. Keep this framing in future edits.
+  - Section still titled "Design Decisions" — Lisa didn't pick a new title; open to rename (e.g. something about alignment).
+  - Card II is intentionally longer than I/III (most important); height imbalance accepted.
+
+### 18:03 — Design Decisions → "Design Principles" + finalized titles + copy polish
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What:
+  - Renamed the section heading (and code comment) from **"Design Decisions" → "Design Principles"** — the three items read better as principles than as a decision list.
+  - Finalized the three card titles (Lisa's wording): **I. Design as a revenue lever**, **II. New component that scales**, **III. Preserve existing features**.
+  - Card I copy polish (per Lisa): killed "tappability signal" → "what made the pill read as a button"; replaced the editorialized "A cleaner pill wasn't free…" with the plainer "Without it, the surface was cleaner but harder to read as tappable."
+  - Card III: pulled in "so the next tap stays in context" (the one genuinely useful idea from a Gemini draft Lisa shared; rejected the rest as resume-speak that violated `voice.mdc`).
+- Decisions:
+  - **Section is "Design Principles"** now, not "Design Decisions."
+  - Reaffirmed voice stance: rejected a polished-but-jargony external rewrite ("drove alignment," "orphaned asset," "design-system stewards," em-dashes) — it failed the "would Lisa say this out loud" test.
+
+---
+
+## 2026-06-16 — Session 26: FMUX real assets dropped in
+
+### 19:55 — FMUX: wired before/experiment screenshots + redesign videos
+
+- Files: `components/portfolio/mobile-screen-placeholder.tsx` (edited), `components/portfolio/unified-flow-section.tsx` (edited), `app/index/first-messaging-experience/page.tsx` (edited), `public/work/fmux/*` (6 assets added).
+- What: Replaced all placeholder slots on FMUX with real exports from `Meta/FMUX/` (Google Drive).
+- **Assets copied** (Drive → `public/work/fmux/`): `Bottom Sheet old.png` → `fb-before.png`; `MSGR old.png` → `msgr-before.png` (also reused as experiment Control); `MSGR A.png` → `variant-a-msgr.png`; `MSGR B.png` → `variant-b-msgr.png`; `FMUX-MSGR.mov` → `flow-msgr.mov`; `FMUX-Bottomsheet.mov` → `flow-bottomsheet.mov`. Keyboard variants intentionally ignored per Lisa.
+- **Slot mapping** (confirmed by Lisa): Before states = FB bottom sheet old + MSGR old. Experiment is **all Messenger**: Control = MSGR old, Variant A = MSGR A (with icon), Variant B = MSGR B (no icon). Mid-page video = Messenger redesign (`flow-msgr.mov`). End "What shipped" video = bottom sheet redesign (`flow-bottomsheet.mov`).
+- **`MobileScreenPlaceholder` now supports real images** — added `src`/`alt` props. When `src` is set, renders `<img className="h-full w-auto object-contain">` inside the device frame and **drops the forced `aspect-ratio: 9/16`** so the frame hugs the screenshot's natural aspect. Screenshots are ~9:19.5 (750×1624, 810×1684), taller than 9:16 — forcing the old aspect would have cropped content. Placeholder text branch unchanged for any slots still without assets.
+- **Vertical video presentation** — both redesign videos are portrait phone recordings (`flow-msgr` 800×1726, `flow-bottomsheet` 758×1632). Landscape containers (ScrollVideo `w-full`, the old `aspect-[16/10]` end slot) would have stretched them. Both now render as **ambient autoplay phones**: `autoPlay loop muted playsInline`, `h-[min(760px,75vh)] w-auto`, device border + atmospheric shadow, centered. Matches the curved-intro video treatment at the top of the page (no ScrollVideo chrome).
+- **`UnifiedFlowSection` gained a `portrait` prop** — when set with `videoSrc`, renders the centered ambient phone instead of `ScrollVideo`. Component is FMUX-only, so the change is safe. ScrollVideo path preserved for landscape use.
+- Decisions:
+  - **Frame hugs media, no forced aspect, for real screenshots/videos.** Same principle as the curved-text video (`max-w` only): constrain one dimension, let the other follow natural aspect. Avoids cropping product UI.
+  - **Ambient autoplay (no controls) is the FMUX video treatment.** Consistent across intro + both redesign demos. ScrollVideo chrome reserved for landscape conclusion videos (GenAI pattern).
+- **Copy decisions made on Lisa's behalf — FLAG FOR REVIEW:**
+  - Renamed mid section `"The unified flow"` → **`"Messenger, redesigned"`** (Lisa said the video isn't a unified flow, it's the Messenger redesign).
+  - Rewrote that section's synthesis to a Messenger-specific line and trimmed tags to `["Messenger", "Icebreakers"]` (was a both-surfaces "unified" framing). **Not yet voice-approved.**
+  - Mid section + end "What shipped" both still carry metric blocks (`+$10M/yr`, CTR TBD) — potentially redundant. Left as-is; worth a pass.
+
+---
+
+## 2026-06-12 — Session 25: FMUX before-states scoped reveal
+
+### 23:45 — FMUX hero: left-align second headline line
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited).
+- What: Removed `ml-[10vw]` from the "in Messenger." headline span so both lines of the hero title stack left-aligned. The indent made the second line sit awkwardly offset from the first.
+- Decisions: None.
+
+### 15:55 — FMUX: staggered scroll reveal for before-states screenshots
+
+- Files: `components/portfolio/reveal-on-scroll.tsx` (created), `app/index/first-messaging-experience/page.tsx` (edited — import + wrapped both before-state screenshots).
+- What: Brought a reveal animation back, but **scoped to the before-states section only** instead of reviving the global `.case-reveal` (which Lisa killed in Session 24 because it made the whole page read as "still loading"). New reusable `RevealOnScroll` client component: fires once via Intersection Observer at 20% visible (`rootMargin: 0px 0px -80px 0px`), fades `opacity 0→1` + `translateY(24px)→0` over **500ms**, accepts a `delay` prop for staggering, and respects `prefers-reduced-motion` (renders visible instantly, no motion).
+- Before-states section: Facebook bottom-sheet screenshot reveals at **0ms**, Messenger at **200ms** — reads as a sequential comparison. `delay={200}` carries the `min-[768px]:mt-24` offset via the new `className` passthrough so the staggered card keeps its vertical offset.
+- Decisions:
+  - **Reusable component over global class.** Per the component-extraction rule, this fade-up will be reused on other sections/case studies, so it lives in `components/portfolio/` rather than as a one-off or a revived global. The inert global `.case-reveal` no-op from Session 24 is untouched and independent of this mechanism.
+  - **Scoped, not global, reveal is the path forward.** If other sections want motion, wrap their children in `RevealOnScroll` deliberately — don't re-enable the blanket fade-up that caused the loading-perception problem.
+  - **Motion is built against placeholders.** Real screenshots will inherit the same reveal unchanged when swapped in; no need to wait on final assets.
+
+---
+
+## 2026-05-27 — Session 24: FMUX section pattern + curved-text polish
+
+### 18:00 — FMUX: GenAI section header pattern + case-reveal kill + curved-text video swap
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `app/globals.css` (edited), `public/work/fmux/icebreaker-curved-intro.mov` (created).
+- What: Aligned FMUX section pattern with GenAI; replaced curved-shape placeholder with real video; iterated curved-text copy and layout to land final state.
+- **Section headers** — All four top-level section headers (`Problem and Constraints`, `The Experiment`, `Design Decisions`, `What shipped`) now use the GenAI pattern: `border-t border-ethos-blue` + `shimmer-line` + `font-serif italic text-3xl text-ethos-blue` h2 with `pt-4 mb-12`. The freestanding hairline that lived under the hero (`border-b border-ethos-blue mt-12`) was removed — its visual job is now done by the hairline at the top of "Problem and Constraints."
+- **Section title rename** — `Two platforms, two problems` → `Problem and Constraints`. Old title was descriptive; new title matches the noun-phrase pattern across other case studies.
+- **Curved-text section** — `.curved-text-shape-right` finalized: float right, **width 50%**, **height 560px**, `shape-outside: ellipse(55% 50% at 70% 50%)`, no border, no background, `justify-content: center`. Video `<video src="/work/fmux/icebreaker-curved-intro.mov" autoPlay loop muted playsInline>` uses **`max-w-[70%]`** only (no `max-h` — keeps video size stable when float height is tuned), `clipPath: inset(10px)` to crop hairline edges, `transform: translate(50px, 5%)` to nudge right + down without affecting text reflow. **Float height was the lever** for "completing the curve": 700px left the bottom paragraph flowing past the float (no curve closure visible); 480px shrunk the video; 560px landed the final line just inside the wrap.
+- **Curved-text copy** — Para 5 rewritten three times. Final framing: design leadership wanted the send icon out of any redesign; Lisa's instinct said the icon was the revenue lever; she proposed an experiment that tested both directions inside the updated visual system. Earlier versions were trimmed for redundancy with paras 1–4 and to drop "Same layout, same type, same motion. Let the data settle it." once it stopped earning its keep.
+- **case-reveal animation killed** — `.case-reveal` (1.2s opacity 0 + 40px translateY fade-up on every section) now no-op: `opacity: 1; transform: none;`. Lisa said it "looks like the page isn't loading." Class still on every section, observer still runs (no harm); easy to restore a snappier 200–250ms version later. The associated `prefers-reduced-motion` block was simplified to only suppress `.shimmer-line` (case-reveal no longer needs it).
+- Decisions:
+  - **`max-h` removed from the curved-text video** — relative max-height couples video size to float height, which made every height tweak shrink the video. Width-only constraint decouples them. Pattern worth reusing whenever a media element sits inside a vertically-tunable shape-outside container.
+  - **Float height ≈ text body height** is the rule for `shape-outside` curve closure. Too tall → text ends inside the float and the wrap doesn't visually close back to full width; too short → text spills past the float and the last lines go full-width without curving back. Sweet spot: float height matches the wrapped body height to within one line.
+  - **GenAI section pattern is the canonical case-study header now.** Hairline + shimmer + italic 3xl blue. FMUX brought into the system; future case studies should default to this.
+  - **The hero hairline is owned by the first section, not the hero.** Removing the dedicated hero hairline and relying on the next section's `border-t` keeps the system consistent and removes a now-redundant separator.
+  - **Section title pattern is "Noun + Noun" or "The X"**, not descriptive sentences. "Problem and Constraints" matches; "Two platforms, two problems" did not.
+- **Known issue, not blocking:** Turbopack's CSS HMR did not pick up changes to `.curved-text-shape-right` or `.case-reveal` mid-session — required a `rm -rf .next && npm run dev` restart twice. Source files were always correct; the served bundle was stale. If a future change to `app/globals.css` doesn't appear in the browser after a hard refresh, restart the dev server before debugging the CSS.
+
+---
+
 ## 2026-05-24 — Session 23: Chroma Capture (second Lab experiment)
 
 ### 20:14 — Chroma Capture v4.12 — density 24 → 30 (with cadence this time)
@@ -582,6 +1040,12 @@ Catching trailing iterations that fell below per-entry logging threshold:
 ---
 
 ## 2026-05-22 — Session 21: First Messaging Experience case study
+
+### 16:45 — FMUX: curved text wrap section (NYT-style shape-outside)
+
+- Files: `app/index/first-messaging-experience/page.tsx` (edited), `app/globals.css` (edited), `docs/SESSION_LOG.md` (edited)
+- What: Replaced "Two platforms, two problems" grid layout with a **curved text wrap** section using CSS `shape-outside: ellipse()`. Body text has a straight left edge and flows around a right-floated elliptical shape (placeholder for image). Copy expanded to cover legacy technical debt, mismatched UI between FB and Messenger, the send-icon performance theory, and divergent frontend infrastructure. Hero intro shortened to a punchy setup line.
+- Decisions: `shape-outside` approach (float-based, not grid). Falls back to stacked layout on mobile. Shape is 45% width, 650px tall on desktop.
 
 ### 19:55 — FMUX: Explorations → Unified Flow section
 

@@ -27,6 +27,11 @@ export default function Contact() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
+    const nav = navigator as Navigator & {
+      connection?: { effectiveType?: string };
+      deviceMemory?: number;
+    };
+
     const payload = {
       name: formData.get("name"),
       email: formData.get("email"),
@@ -34,7 +39,24 @@ export default function Contact() {
       honeypot: formData.get("_hp"),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       screenResolution: `${window.screen.width}x${window.screen.height}`,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      devicePixelRatio: window.devicePixelRatio,
       timeOnPage: Math.round((Date.now() - loadTime.current) / 1000),
+      language: nav.language,
+      languages: nav.languages?.join(", "),
+      platform: nav.platform,
+      deviceMemory: nav.deviceMemory,
+      hardwareConcurrency: nav.hardwareConcurrency,
+      maxTouchPoints: nav.maxTouchPoints,
+      connection: nav.connection?.effectiveType,
+      cookieEnabled: nav.cookieEnabled,
+      doNotTrack: nav.doNotTrack,
+      prefersColorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light",
+      prefersReducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      referrer: document.referrer || "direct",
+      pageUrl: window.location.href,
     };
 
     try {

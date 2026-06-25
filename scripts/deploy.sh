@@ -24,18 +24,33 @@ else
   RSYNC_RSH="ssh"
 fi
 
-if [[ -z "${NEXT_PUBLIC_CONTACT_FORM_URL:-}" ]]; then
-  echo "Warning: NEXT_PUBLIC_CONTACT_FORM_URL is not set — contact form will not work after deploy." >&2
-  echo "Add your Formspree URL to .env.deploy (see env.deploy.example)." >&2
+FORMSPREE_URL="${FORMSPREE_URL:-${NEXT_PUBLIC_CONTACT_FORM_URL:-}}"
+if [[ -z "$FORMSPREE_URL" ]]; then
+  echo "Warning: FORMSPREE_URL is not set — contact form will not work after deploy." >&2
+  echo "Add your Formspree endpoint to .env.deploy (see env.deploy.example)." >&2
 fi
 
 echo "→ Building static site (out/)…"
+# Browser posts to PHP proxy; Formspree URL stays server-side in generated contact-submit.php.
+export NEXT_PUBLIC_CONTACT_FORM_URL="/contact-submit.php"
 npm run build
 
 OUT_DIR="$ROOT_DIR/out"
 if [[ ! -f "$OUT_DIR/index.html" ]]; then
   echo "Build did not produce out/index.html" >&2
   exit 1
+fi
+
+if [[ -n "$FORMSPREE_URL" ]]; then
+  echo "→ Generating contact-submit.php (IP logging proxy)…"
+  FORMSPREE_URL_ESCAPED="${FORMSPREE_URL//\\/\\\\}"
+  FORMSPREE_URL_ESCAPED="${FORMSPREE_URL_ESCAPED//|/\\|}"
+  FORMSPREE_URL_ESCAPED="${FORMSPREE_URL_ESCAPED//&/\\&}"
+  sed "s|__FORMSPREE_URL__|${FORMSPREE_URL_ESCAPED}|g" \
+    "$ROOT_DIR/scripts/contact-submit.php.template" \
+    > "$OUT_DIR/contact-submit.php"
+else
+  echo "Warning: skipping contact-submit.php — FORMSPREE_URL not set." >&2
 fi
 
 echo "→ Uploading to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}…"

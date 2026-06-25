@@ -9,11 +9,15 @@ RewriteEngine On
 # Allow Let's Encrypt HTTP-01 validation (do not redirect to HTTPS).
 RewriteRule ^\.well-known/acme-challenge/ - [L]
 
+# Canonical host: www → apex, always HTTPS (one hop for http://www…).
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+# Force HTTPS on apex.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
 # Next.js static export quirk: routes under app/index/ export to /index/index/…
 # on disk, but the site links to /index/… — rewrite internally so URLs stay clean.
 RewriteRule ^index/(first-messaging-experience|genai-conversations|inbox-ads|journey-explorer|virtual-agent)/?$ index/index/$1/ [L]
 RewriteRule ^index/?$ index/index/ [L]
-
-# Force HTTPS (after ACME + path rewrites).
-RewriteCond %{HTTPS} !=on
-RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

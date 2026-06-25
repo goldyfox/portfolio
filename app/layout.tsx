@@ -22,7 +22,7 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.lisaaufox.com"),
+  metadataBase: new URL("https://lisaaufox.com"),
   title: "Lisa Aufox — Product Design",
   description:
     "Portfolio of Lisa Aufox, a product designer working at the intersection of AI, monetization, and messaging at Meta.",

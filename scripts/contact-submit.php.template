@@ -1,0 +1,188 @@
+<?php
+/**
+ * Contact form proxy for DreamHost shared hosting.
+ * Injected at deploy time — do not edit the generated out/contact-submit.php.
+ *
+ * Reads client IP from proxy headers, then forwards to Formspree.
+ */
+declare(strict_types=1);
+
+header('Content-Type: application/json; charset=utf-8');
+
+const FORMSPREE_URL = '__FORMSPREE_URL__';
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW = 3600;
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Method not allowed.']);
+    exit;
+}
+
+$raw = file_get_contents('php://input');
+$data = json_decode($raw ?: '', true);
+if (!is_array($data)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body.']);
+    exit;
+}
+
+// Honeypot — silent success for bots.
+if (!empty($data['_gotcha'])) {
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+$timeOnPage = isset($data['timeOnPage']) ? (int) $data['timeOnPage'] : null;
+if ($timeOnPage !== null && $timeOnPage < 3) {
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+$name = trim((string) ($data['name'] ?? ''));
+$email = trim((string) ($data['email'] ?? ''));
+$message = trim((string) ($data['message'] ?? ''));
+
+if ($name === '' || $email === '' || $message === '') {
+    http_response_code(400);
+    echo json_encode(['error' => 'All fields are required.']);
+    exit;
+}
+
+$ipInfo = get_client_ip();
+$ip = $ipInfo['ip'];
+
+if (!check_rate_limit($ip)) {
+    http_response_code(429);
+    echo json_encode(['error' => 'Too many submissions. Try again later.']);
+    exit;
+}
+
+$payload = array_merge($data, [
+    'name' => $name,
+    'email' => $email,
+    'message' => $message,
+    'ipAddress' => $ip,
+    'ipSource' => $ipInfo['source'],
+    'xForwardedFor' => $ipInfo['x_forwarded_for'],
+    'remoteAddr' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    'userAgentHeader' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+    'refererHeader' => $_SERVER['HTTP_REFERER'] ?? 'direct',
+    'acceptLanguageHeader' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'unknown',
+    'submittedAt' => gmdate('c'),
+]);
+
+$ch = curl_init(FORMSPREE_URL);
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'Accept: application/json',
+    ],
+    CURLOPT_POSTFIELDS => json_encode($payload),
+    CURLOPT_TIMEOUT => 15,
+]);
+
+$response = curl_exec($ch);
+$status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlError = curl_error($ch);
+curl_close($ch);
+
+if ($response === false || $status >= 400) {
+    http_response_code(502);
+    echo json_encode(['error' => 'Something went wrong. Please try again.']);
+    exit;
+}
+
+http_response_code($status > 0 ? $status : 200);
+echo $response !== false && $response !== '' ? $response : json_encode(['success' => true]);
+
+/** @return array{ip: string, source: string, x_forwarded_for: string} */
+function get_client_ip(): array
+{
+    $xForwardedFor = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+    $candidates = [
+        ['HTTP_CF_CONNECTING_IP', 'cf-connecting-ip'],
+        ['HTTP_X_FORWARDED_FOR', 'x-forwarded-for'],
+        ['HTTP_X_REAL_IP', 'x-real-ip'],
+        ['HTTP_CLIENT_IP', 'client-ip'],
+        ['REMOTE_ADDR', 'remote-addr'],
+    ];
+
+    foreach ($candidates as [$header, $source]) {
+        if (empty($_SERVER[$header])) {
+            continue;
+        }
+
+        $value = (string) $_SERVER[$header];
+        if ($header === 'HTTP_X_FORWARDED_FOR') {
+            $parts = array_map('trim', explode(',', $value));
+            foreach ($parts as $part) {
+                if (filter_var($part, FILTER_VALIDATE_IP)) {
+                    return [
+                        'ip' => $part,
+                        'source' => $source,
+                        'x_forwarded_for' => $xForwardedFor ?: $value,
+                    ];
+                }
+            }
+            continue;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_IP)) {
+            return [
+                'ip' => $value,
+                'source' => $source,
+                'x_forwarded_for' => $xForwardedFor ?: 'none',
+            ];
+        }
+    }
+
+    $fallback = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    return [
+        'ip' => $fallback,
+        'source' => 'fallback',
+        'x_forwarded_for' => $xForwardedFor ?: 'none',
+    ];
+}
+
+function check_rate_limit(string $ip): bool
+{
+    if ($ip === 'unknown') {
+        return true;
+    }
+
+    $path = sys_get_temp_dir() . '/lisa_portfolio_contact_rates.json';
+    $now = time();
+    $rates = [];
+
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            $rates = $decoded;
+        }
+    }
+
+    foreach ($rates as $key => $entry) {
+        if (!is_array($entry) || ($entry['resetAt'] ?? 0) <= $now) {
+            unset($rates[$key]);
+        }
+    }
+
+    $entry = $rates[$ip] ?? null;
+    if (!$entry) {
+        $rates[$ip] = ['count' => 1, 'resetAt' => $now + RATE_LIMIT_WINDOW];
+        file_put_contents($path, json_encode($rates));
+        return true;
+    }
+
+    if (($entry['count'] ?? 0) >= RATE_LIMIT_MAX) {
+        return false;
+    }
+
+    $entry['count'] = ($entry['count'] ?? 0) + 1;
+    $rates[$ip] = $entry;
+    file_put_contents($path, json_encode($rates));
+    return true;
+}

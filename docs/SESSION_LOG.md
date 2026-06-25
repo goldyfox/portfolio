@@ -4,6 +4,18 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ---
 
+## 2026-06-24 — Session 32: Contact form IP logging
+
+### 18:25 — Canonical redirects: www → lisaaufox.com + HTTPS
+- Files: `public/.htaccess`, `app/layout.tsx` (edited).
+- What: Added Apache rules — `www` → apex in one hop (includes HTTPS), then HTTP → HTTPS for apex. Moved redirect rules before internal `/index/` rewrites. Updated `metadataBase` to `https://lisaaufox.com`. Deployed.
+- Decisions: **Canonical host is apex (no www).** ACME `.well-known` still exempt.
+
+### 18:15 — PHP contact proxy adds IP behind DreamHost proxies
+- Files: `scripts/contact-submit.php.template` (created), `scripts/deploy.sh`, `app/contact/page.tsx`, `env.deploy.example` (edited).
+- What: Browser now POSTs to `/contact-submit.php` on DreamHost. PHP reads client IP from `X-Forwarded-For` (first hop), `X-Real-IP`, `Client-IP`, `REMOTE_ADDR`; forwards to Formspree with `ipAddress`, `ipSource`, `xForwardedFor`, `remoteAddr`, plus server headers. Formspree URL stays server-side (injected at deploy). Rate limit + honeypot preserved. Deployed.
+- Decisions: PHP proxy on shared hosting (DreamHost supports it); Formspree ID not baked into client JS anymore. Local dev: set Formspree URL in `.env.local` to bypass PHP.
+
 ## 2026-06-23 — Session 31: Navigation + Doodles layout
 
 ### 17:50 — .htaccess: block directory listings, fix /index/* 403s

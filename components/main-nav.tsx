@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 import { usePathname } from "next/navigation";
 
 const nav = [
@@ -26,7 +26,7 @@ export function MainNav() {
           const active = isActive(pathname, href);
           return (
             <li key={href}>
-              <Link
+              <SiteLink
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={
@@ -37,7 +37,7 @@ export function MainNav() {
               >
                 <span className="min-[575px]:hidden">[{label}]</span>
                 <span className="hidden min-[575px]:inline">[ {num} {label} ]</span>
-              </Link>
+              </SiteLink>
             </li>
           );
         })}

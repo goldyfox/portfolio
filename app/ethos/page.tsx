@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 
 export const metadata: Metadata = {
   title: "Lisa Aufox | About",
@@ -95,12 +95,12 @@ export default function About() {
             <p className="max-w-[36ch] font-serif text-[clamp(1.25rem,2.5vw,1.75rem)] leading-[1.4] text-gray-800 italic">
               Want to talk?
             </p>
-            <Link
+            <SiteLink
               href="/contact"
               className="mt-6 inline-block font-sans text-[11px] uppercase tracking-[0.1em] text-ethos-blue underline decoration-ethos-blue decoration-[1px] underline-offset-[0.35em]"
             >
               Get in touch &rarr;
-            </Link>
+            </SiteLink>
           </div>
         </div>
       </div>

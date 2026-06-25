@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { briefs } from "@/lib/content/briefs";
@@ -37,7 +37,7 @@ export function ProjectTile({
   priority = false,
 }: ProjectTileProps) {
   return (
-    <Link
+    <SiteLink
       href={href}
       className={`project-card group flex flex-col gap-4 ${className ?? ""}`}
     >
@@ -85,6 +85,6 @@ export function ProjectTile({
           {brief.domains.join(" / ")}
         </p>
       </div>
-    </Link>
+    </SiteLink>
   );
 }

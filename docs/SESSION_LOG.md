@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 19:05 — Disable Next.js Link prefetch (fixes HEAD/CORS on static export)
+- Files: `components/site-link.tsx` (created), `app/layout.tsx`, `components/main-nav.tsx`, `components/footer-nav.tsx`, `components/portfolio/back-to-index.tsx`, `components/portfolio/project-tile.tsx`, `components/portfolio/catalog-filter.tsx`, `app/ethos/page.tsx`, `next.config.ts`.
+- What: Next.js 16 `<Link>` prefetch was issuing `HEAD https://lisaaufox.com/` (then following DreamHost apex→www redirect → CORS failure). All internal links now use `SiteLink` with `prefetch={false}` — correct fix for static export on Apache.
+- Decisions: Full prefetch disable site-wide on static export; use plain navigation (full page load) instead of broken RSC prefetch.
+
 ### 18:55 — Apex-only canonical: fix contact CORS / www redirect
 - Files: `lib/site-url.ts` (created), `app/layout.tsx`, `app/contact/page.tsx`, `scripts/contact-submit.php.template`, `scripts/deploy.sh`, `public/.htaccess`.
 - What: Production contact form now **always** POSTs to same-origin `/contact-submit.php` (never env-baked absolute URLs that could cross apex/www). `SITE_ORIGIN` constant + canonical metadata. PHP handles OPTIONS + CORS for apex only. Deploy message + htaccess comments updated.

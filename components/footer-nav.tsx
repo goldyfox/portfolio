@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 import { usePathname } from "next/navigation";
 
 type FooterLink = {
@@ -37,12 +37,12 @@ export function FooterNav() {
                 {label}
               </a>
             ) : (
-              <Link
+              <SiteLink
                 href={href}
                 className={active ? "text-ethos-blue" : "text-gray-900"}
               >
                 {label}
-              </Link>
+              </SiteLink>
             )}
           </li>
         );

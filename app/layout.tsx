@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Newsreader } from "next/font/google";
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 import { MainNav } from "@/components/main-nav";
 import { FooterNav } from "@/components/footer-nav";
 import { FlipTitle } from "@/components/flip-title";
@@ -67,7 +67,7 @@ export default function RootLayout({
             <div
               className={`relative z-10 flex flex-wrap items-center gap-4 py-5 min-[975px]:gap-8 ${SITE_CONTENT_SHELL}`}
             >
-              <Link
+              <SiteLink
                 href="/"
                 aria-label="Lisa Aufox, Product Design"
                 className="order-1 site-title-link inline-flex flex-wrap items-baseline gap-x-0 font-sans text-[14px] tracking-[0.1em] text-gray-900 uppercase"
@@ -82,9 +82,9 @@ export default function RootLayout({
                   |
                 </span>
                 <FlipTitle />
-              </Link>
+              </SiteLink>
 
-              <Link
+              <SiteLink
                 href="/contact"
                 aria-label="Contact"
                 className="group relative order-2 ml-auto -translate-y-[2.5px] min-[975px]:order-3 min-[975px]:ml-0 min-[975px]:-translate-y-[1px]"
@@ -121,7 +121,7 @@ export default function RootLayout({
                   <polygon points="0.5,5 9,13 17.5,5" fill="#1313ec" stroke="currentColor" />
                   <path d="M0.5 5L9 0.5L17.5 5" />
                 </svg>
-              </Link>
+              </SiteLink>
 
               <div className="order-3 basis-full min-[975px]:order-2 min-[975px]:basis-auto min-[975px]:flex-1">
                 <MainNav />

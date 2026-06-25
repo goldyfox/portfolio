@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { SiteLink } from "@/components/site-link";
 import type { CatalogRow, Domain } from "@/lib/content/types";
 import { getPublicRows, filterByDomain } from "@/lib/content/catalog";
 
@@ -118,7 +118,7 @@ function CatalogRowItem({ row }: { row: CatalogRow }) {
   );
 
   if (row.slug) {
-    return <Link href={`/index/${row.slug}`}>{inner}</Link>;
+    return <SiteLink href={`/index/${row.slug}`}>{inner}</SiteLink>;
   }
 
   return inner;

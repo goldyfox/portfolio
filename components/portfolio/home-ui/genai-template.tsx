@@ -62,7 +62,7 @@ type Phase = "default" | "glimmer" | "genai";
 // taller greeting slot + adjusted offsets; desktop grid keeps Figma coords.
 const PANEL_LAYOUT = {
   desktop: {
-    greetingBodyTop: 30,
+    greetingBodyTop: 34,
     greetingBodyHeight: 18,
     questionsHeadingTop: 62,
     questionsBodyTop: 84,

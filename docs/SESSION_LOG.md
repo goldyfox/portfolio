@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 20:15 — GenAI tile: desktop greeting body p(34)
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: Desktop greeting heading→body gap tuned from p(30) to p(34). Mobile panel layout unchanged.
+- Decisions: None.
+
 ### 20:05 — GenAI tile: mobile panel at 767px viewport, not tile width
 - Files: `components/portfolio/home-ui/genai-template.tsx`, `components/portfolio/use-tile-compact.ts` (edited).
 - What: Mobile greeting panel layout was applying on desktop because the grid column is often <420px wide. Switched to `useMobileViewport(767)` so desktop grid always uses Figma coords; mobile stack keeps tuned panel offsets + taller greeting slot.

@@ -30,6 +30,9 @@ if [[ -z "$FORMSPREE_URL" ]]; then
   echo "Add your Formspree endpoint to .env.deploy (see env.deploy.example)." >&2
 fi
 
+echo "→ Normalizing public/ permissions…"
+bash "$ROOT_DIR/scripts/normalize-deploy-permissions.sh" "$ROOT_DIR/public"
+
 echo "→ Building static site (out/)…"
 npm run build
 
@@ -51,9 +54,25 @@ else
   echo "Warning: skipping contact-submit.php — FORMSPREE_URL not set." >&2
 fi
 
+echo "→ Normalizing deploy bundle permissions…"
+bash "$ROOT_DIR/scripts/normalize-deploy-permissions.sh" "$OUT_DIR"
+
+echo "→ Verifying deploy bundle (no secrets)…"
+bash "$ROOT_DIR/scripts/verify-deploy-bundle.sh" "$OUT_DIR"
+
 echo "→ Uploading to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}…"
 echo "  (rsync --delete removes files on the server that are not in out/)"
 rsync -avz --delete \
+  --chmod=D755,F644 \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.git/' \
+  --exclude='node_modules/' \
+  --exclude='*.pem' \
+  --exclude='*.key' \
+  --exclude='.htpasswd' \
+  --exclude='id_rsa' \
+  --exclude='id_ed25519' \
   -e "$RSYNC_RSH" \
   "$OUT_DIR/" \
   "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"

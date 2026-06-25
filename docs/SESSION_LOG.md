@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 19:20 — Deploy: fix permissions (don't block), block secrets only
+- Files: `scripts/normalize-deploy-permissions.sh`, `scripts/verify-deploy-bundle.sh`, `scripts/deploy.sh` (created/updated).
+- What: Before build, normalize `public/` (fix 600 files / 700 dirs → 644/755). After build, normalize `out/` the same way. Verify step **only blocks secrets** (`.env*`, keys, pem, etc.) — never blocks on permissions. rsync excludes secrets as belt-and-suspenders.
+- Decisions: Fix restrictive modes in place; do not fail deploy for permission issues in public/out.
+
 ### 19:05 — Disable Next.js Link prefetch (fixes HEAD/CORS on static export)
 - Files: `components/site-link.tsx` (created), `app/layout.tsx`, `components/main-nav.tsx`, `components/footer-nav.tsx`, `components/portfolio/back-to-index.tsx`, `components/portfolio/project-tile.tsx`, `components/portfolio/catalog-filter.tsx`, `app/ethos/page.tsx`, `next.config.ts`.
 - What: Next.js 16 `<Link>` prefetch was issuing `HEAD https://lisaaufox.com/` (then following DreamHost apex→www redirect → CORS failure). All internal links now use `SiteLink` with `prefetch={false}` — correct fix for static export on Apache.

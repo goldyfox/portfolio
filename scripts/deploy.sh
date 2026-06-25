@@ -62,8 +62,8 @@ bash "$ROOT_DIR/scripts/verify-deploy-bundle.sh" "$OUT_DIR"
 
 echo "→ Uploading to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}…"
 echo "  (rsync --delete removes files on the server that are not in out/)"
+# macOS rsync (2.x) does not support --chmod; perms are set locally before upload.
 rsync -avz --delete \
-  --chmod=D755,F644 \
   --exclude='.env' \
   --exclude='.env.*' \
   --exclude='.git/' \
@@ -76,5 +76,9 @@ rsync -avz --delete \
   -e "$RSYNC_RSH" \
   "$OUT_DIR/" \
   "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+
+echo "→ Normalizing permissions on server…"
+ssh ${SSH_KEY:+-i "$SSH_KEY"} "${DEPLOY_USER}@${DEPLOY_HOST}" \
+  "find '${DEPLOY_PATH}' -type d -exec chmod 755 {} + && find '${DEPLOY_PATH}' -type f -exec chmod 644 {} +"
 
 echo "✓ Deploy complete — https://lisaaufox.com"

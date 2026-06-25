@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-23 — Session 31: Navigation + Doodles layout
 
+### 17:50 — .htaccess: block directory listings, fix /index/* 403s
+- Files: `public/.htaccess` (edited).
+- What: `-Indexes` alone was 403ing `/index/inbox-ads/` etc. because Next.js static export puts `app/index/*` pages at `/index/index/…` on disk while site links use `/index/…`. Added `DirectoryIndex index.html`, internal rewrite rules for catalog + case-study slugs, and kept ACME + HTTPS rules. Deployed.
+- Decisions: URL stays `/index/inbox-ads/` in the browser; Apache serves from `/index/index/inbox-ads/` internally. Long-term alternative is renaming `app/index/` route folder to avoid double-nesting.
+
 ### 20:30 — First production deploy to DreamHost shared
 - Files: none (deploy only via `npm run deploy`).
 - What: Built static export and rsync'd 232 files to `/home/dh_au54yu/lisaaufox.com`. DNS now points both apex and www to DreamHost (`173.236.198.112`). Contact form not configured — `NEXT_PUBLIC_CONTACT_FORM_URL` still unset in `.env.deploy`.

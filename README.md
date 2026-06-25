@@ -29,8 +29,26 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploying to Dreamhost
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The site is deployed via rsync, using SFTP to Dreamhost. It uses the SSH identity file `id_ed25519` in your `~/.ssh/` folder. 
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploy variables are stored in `.env.deploy`. This file is NOT checked into github for security reasons.
+
+
+To deploy the site, commit all changes via:
+
+```
+git commit -a -m 'message'
+```
+
+Push changes
+
+```
+git push
+```
+
+Then, run the deploy script
+```
+npm run deploy
+```

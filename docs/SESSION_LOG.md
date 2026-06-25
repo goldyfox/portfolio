@@ -6,6 +6,16 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 19:25 — FMUX tile: measured fly distance (fixes sent/welcome overlap)
+- Files: `components/portfolio/home-ui/fmux-chat.tsx` (edited).
+- What: Fixed cqw constants couldn't account for welcome text wrap at every tile width. Fly distance + "Sent" label now measured from the welcome bubble's rendered bottom via ResizeObserver; re-measured before each send cycle and on font load.
+- Decisions: Drop narrow breakpoint tuning; layout-driven px transforms instead.
+
+### 19:10 — FMUX tile: fix sent-bubble overlap on narrow/mobile (superseded)
+- Files: `components/portfolio/home-ui/fmux-chat.tsx` (edited).
+- What: Welcome text wraps on narrow tiles, making the grey bubble taller while fly distance stayed the same — sent pill landed on top of it. Narrow mode now flies ~7.5cqw less, slightly smaller welcome type, reverted bad stackBottom/sentLabelTop nudges from prior mobile pass.
+- Decisions: Tune fly constants per breakpoint, not stack position alone.
+
 ### 18:35 — Contact focus state + mobile homepage tile spacing
 - Files: `components/portfolio/contact-field.tsx`, `components/portfolio/use-tile-compact.ts` (created), `app/contact/page.tsx`, `app/globals.css`, `app/page.tsx`, `components/portfolio/project-tile.tsx`, `components/portfolio/home-ui/{inbox-surfaces,genai-template,fmux-chat}.tsx` (edited).
 - What: Contact fields — removed browser focus box (outline-none + globals backup); floating labels now move to `top-0` on focus/fill instead of translate hack that overlapped the ring. Homepage mobile — increased tile stack gap (`gap-y-32`), compact scaling for inbox triptych in short 16:9 tiles, reduced GenAI card inset padding on narrow tiles, FMUX stack nudge on narrow tiles.

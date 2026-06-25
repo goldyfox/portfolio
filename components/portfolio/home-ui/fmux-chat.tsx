@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useTileNarrow } from "@/components/portfolio/use-tile-compact";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /**
  * Homepage tile: a Messenger thread, authentic to the Messenger design system.
@@ -9,48 +8,44 @@ import { useTileNarrow } from "@/components/portfolio/use-tile-compact";
  * Resting state: grey welcome bubble at the top, three light-blue icebreaker
  * pills anchored at the bottom (just above the composer). On play, the top
  * icebreaker travels straight up to sit under the welcome message and morphs
- * into a solid-blue "sent" bubble; the other two pills hold at the bottom.
+ * into a solid-blue "sent" bubble; the other two pills hold in place.
  *
- * Colors are sampled from Lisa's Figma exports; motion uses the exact Smart
- * Animate spec: cubic-bezier(1, 0.01, 0.03, 0.04), 400ms.
+ * Fly distance is measured from the welcome bubble's rendered bottom edge so
+ * text wrap at any tile width can't cause overlap with the sent state.
  *
- * The tile sits in a fixed 4:5 box, so vertical positions are expressed in
- * container-query width units (cqw) and stay proportional at any tile size.
- *
- * `active` drives the loop (for the homepage orchestrator). When omitted, the
- * tile self-loops so it can be tested standalone. prefers-reduced-motion holds
- * the resting state.
+ * `active` drives the loop for the homepage orchestrator. When omitted, the
+ * tile self-loops. prefers-reduced-motion holds the resting state.
  */
 
 const MSGR_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-// Stage 1: the icebreaker flies up + recolors (original Smart Animate spec).
 const MORPH = "400ms cubic-bezier(1, 0.01, 0.03, 0.04)";
-// Stage 3: the bubble settles the last bit into place (Ease in and out, 300ms).
 const SETTLE = "300ms cubic-bezier(0.42, 0, 0.58, 1)";
-// Reset: the sent bubble fades out, then a fresh pill slides up into the stack
-// with a small overshoot (easeOutBack) — never a reverse of the send.
 const FADE = "320ms ease";
 const ENTER = "440ms cubic-bezier(0.34, 1.56, 0.64, 1)";
 
-// Exact values from Lisa's Figma SVG exports (icebreaker.svg / Sent.svg)
 const GREY_BUBBLE = "#F2F4F7";
 const INK = "#080809";
 const PILL_BLUE = "#EBF5FF";
 const SENT_BLUE = "#0866FF";
 const SUBTLE = "#65676B";
 
-// Layout anchors, in cqw (1cqw = 1% of tile width; tile is 4:5 so height = 125cqw).
-// The top icebreaker lives in the bottom stack and flies UP via transform
-// (negative = upward), so its rest gap matches the stack's gap automatically.
-const FLY_1 = -51.4; // stage 1: up to just below final
-const FLY_2 = -54; // stage 3: settle into the final spot under the welcome
-const ENTER_FROM = 9; // reset: pill slides up from this far below its slot
-const STACK_BOTTOM = 15.5; // bottom offset of the pill stack (clears the composer)
-const SENT_LABEL_TOP = 34.1; // "Sent" metatext vertical anchor (nudged ~4px up toward the bubble)
+// cqw fallbacks until first layout measure (stage-1 is ~95% of final fly).
+const FLY_1 = -51.4;
+const FLY_2 = -54;
+const FLY_1_RATIO = FLY_1 / FLY_2;
+const ENTER_FROM = 9;
+const STACK_BOTTOM = 15.5;
+const GAP_BELOW_WELCOME = 0.02; // 2cqw gap under incoming bubble
+const GAP_BELOW_SENT = 0.012; // 1.2cqw gap before "Sent" label
+
+type FlyMetrics = {
+  fly1Px: number;
+  fly2Px: number;
+  sentLabelTopPx: number;
+};
 
 function SendIcon({ size }: { size: string }) {
-  // Exact Messenger send glyph (new-sender.svg), inlined verbatim.
   return (
     <svg
       width={size}
@@ -72,13 +67,14 @@ interface FmuxChatProps {
   active?: boolean;
 }
 
-// rest → fly (up + recolor) → settle (+"Sent") → fade (bubble fades out) →
-// enterPrep (snap pill below slot, invisible) → enter (slide up + bounce) → rest
 type Phase = "rest" | "fly" | "settle" | "fade" | "enterPrep" | "enter";
 
 export function FmuxChat({ active }: FmuxChatProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const narrow = useTileNarrow(rootRef);
+  const welcomeRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
+  const flyerRef = useRef<HTMLDivElement>(null);
+  const [flyMetrics, setFlyMetrics] = useState<FlyMetrics | null>(null);
   const [phase, setPhase] = useState<Phase>("rest");
   const [reduced, setReduced] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -90,6 +86,47 @@ export function FmuxChat({ active }: FmuxChatProps) {
     const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const measureFly = () => {
+    const root = rootRef.current;
+    const welcome = welcomeRef.current;
+    const stack = stackRef.current;
+    const flyer = flyerRef.current;
+    if (!root || !welcome || !stack || !flyer) return;
+
+    const rootRect = root.getBoundingClientRect();
+    if (rootRect.width <= 0) return;
+
+    const welcomeBottom = welcome.getBoundingClientRect().bottom - rootRect.top;
+    const gap = rootRect.width * GAP_BELOW_WELCOME;
+    const targetTop = welcomeBottom + gap;
+
+    const stackTop = stack.getBoundingClientRect().top - rootRect.top;
+    const restTop = stackTop + flyer.offsetTop;
+    const fly2Px = targetTop - restTop;
+    const fly1Px = fly2Px * FLY_1_RATIO;
+    const sentLabelTopPx =
+      targetTop + flyer.offsetHeight + rootRect.width * GAP_BELOW_SENT;
+
+    setFlyMetrics({ fly1Px, fly2Px, sentLabelTopPx });
+  };
+
+  useLayoutEffect(() => {
+    measureFly();
+    const root = rootRef.current;
+    const welcome = welcomeRef.current;
+    if (!root) return;
+
+    const ro = new ResizeObserver(measureFly);
+    ro.observe(root);
+    if (welcome) ro.observe(welcome);
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(measureFly);
+    }
+
+    return () => ro.disconnect();
   }, []);
 
   const selfLoop = active === undefined;
@@ -111,29 +148,29 @@ export function FmuxChat({ active }: FmuxChatProps) {
       return clear;
     }
 
-    const HOLD_REST = 1400; // pills sit before the send fires
-    const FLY_PAUSE = 700; // stage-1 fly (400) + "After delay" (300)
-    const HOLD_SENT = 5200; // final sent state holds before the reset (+3s dwell)
-    const FADE_MS = 320; // bubble fades out
-    const ENTER_MS = 440; // fresh pill slides up + bounces in
+    const HOLD_REST = 1400;
+    const FLY_PAUSE = 700;
+    const HOLD_SENT = 5200;
+    const FADE_MS = 320;
+    const ENTER_MS = 440;
 
     const push = (fn: () => void, ms: number) =>
       timers.current.push(setTimeout(fn, ms));
 
     const run = () => {
+      measureFly();
       push(() => {
-        setPhase("fly"); // stage 1: fly up + recolor
+        measureFly();
+        setPhase("fly");
         push(() => {
-          setPhase("settle"); // stage 3: settle + "Sent"
+          setPhase("settle");
           push(() => {
-            setPhase("fade"); // bubble fades out in place
+            setPhase("fade");
             push(() => {
-              setPhase("enterPrep"); // snap a pill just below its slot, hidden
-              // two frames so the browser paints the prep state before we
-              // transition into the bounce-in.
+              setPhase("enterPrep");
               raf.current = requestAnimationFrame(() => {
                 raf.current = requestAnimationFrame(() => {
-                  setPhase("enter"); // slide up + small bounce
+                  setPhase("enter");
                   push(() => {
                     setPhase("rest");
                     if (selfLoop) run();
@@ -151,18 +188,23 @@ export function FmuxChat({ active }: FmuxChatProps) {
   }, [reduced, playing, selfLoop]);
 
   const c = (n: number) => `${n}cqw`;
-
-  // The morphing pill is "blue" (a sent bubble) only while it's up top.
   const isBlue = phase === "fly" || phase === "settle" || phase === "fade";
 
-  const flyerTransform =
-    phase === "fly"
+  const flyerTransform = flyMetrics
+    ? phase === "fly"
+      ? `translateY(${flyMetrics.fly1Px}px)`
+      : phase === "settle" || phase === "fade"
+        ? `translateY(${flyMetrics.fly2Px}px)`
+        : phase === "enterPrep"
+          ? `translateY(${c(ENTER_FROM)})`
+          : "translateY(0)"
+    : phase === "fly"
       ? `translateY(${c(FLY_1)})`
       : phase === "settle" || phase === "fade"
         ? `translateY(${c(FLY_2)})`
         : phase === "enterPrep"
           ? `translateY(${c(ENTER_FROM)})`
-          : "translateY(0)"; // rest + enter (bounce lands here)
+          : "translateY(0)";
 
   const flyerTransition =
     phase === "fly"
@@ -173,7 +215,7 @@ export function FmuxChat({ active }: FmuxChatProps) {
           ? `opacity ${FADE}`
           : phase === "enter"
             ? `transform ${ENTER}, opacity ${FADE}`
-            : "none"; // rest + enterPrep snap instantly
+            : "none";
 
   const pillBase: React.CSSProperties = {
     display: "flex",
@@ -188,9 +230,6 @@ export function FmuxChat({ active }: FmuxChatProps) {
     whiteSpace: "nowrap",
   };
 
-  const stackBottom = narrow ? 12.5 : STACK_BOTTOM;
-  const sentLabelTop = narrow ? 31.5 : SENT_LABEL_TOP;
-
   return (
     <div
       ref={rootRef}
@@ -204,7 +243,6 @@ export function FmuxChat({ active }: FmuxChatProps) {
         overflow: "hidden",
       }}
     >
-      {/* Ad-context line */}
       <p
         style={{
           position: "absolute",
@@ -221,7 +259,6 @@ export function FmuxChat({ active }: FmuxChatProps) {
         <span style={{ color: SENT_BLUE, fontWeight: 600 }}>View ad</span>
       </p>
 
-      {/* Incoming: avatar + grey welcome bubble */}
       <div
         style={{
           position: "absolute",
@@ -245,6 +282,7 @@ export function FmuxChat({ active }: FmuxChatProps) {
           }}
         />
         <div
+          ref={welcomeRef}
           style={{
             background: GREY_BUBBLE,
             color: INK,
@@ -260,13 +298,10 @@ export function FmuxChat({ active }: FmuxChatProps) {
         </div>
       </div>
 
-      {/* "Sent" metatext, fades in under the bubble once settled */}
       <span
         style={{
           position: "absolute",
-          top: c(sentLabelTop),
-          // align the "t" with where the bubble's straight edge ends (one
-          // corner-radius in from the bubble's right edge), not its outer curve
+          top: flyMetrics ? `${flyMetrics.sentLabelTopPx}px` : c(34.1),
           right: c(7.2),
           fontSize: c(2.3),
           color: SUBTLE,
@@ -277,12 +312,11 @@ export function FmuxChat({ active }: FmuxChatProps) {
         Sent
       </span>
 
-      {/* Icebreakers, anchored bottom above the composer. The top pill flies
-          up + morphs into the sent bubble; the other two hold in place. */}
       <div
+        ref={stackRef}
         style={{
           position: "absolute",
-          bottom: c(stackBottom),
+          bottom: c(STACK_BOTTOM),
           left: c(4.5),
           right: c(4.5),
           display: "flex",
@@ -292,9 +326,10 @@ export function FmuxChat({ active }: FmuxChatProps) {
         }}
       >
         <div
+          ref={flyerRef}
           style={{
             ...pillBase,
-            gap: 0, // icon spacing is on the icon's margin so it collapses evenly
+            gap: 0,
             position: "relative",
             zIndex: 2,
             background: isBlue ? SENT_BLUE : PILL_BLUE,
@@ -312,7 +347,6 @@ export function FmuxChat({ active }: FmuxChatProps) {
               marginLeft: isBlue ? 0 : c(1.8),
               maxWidth: isBlue ? 0 : c(5.6),
               opacity: isBlue ? 0 : 1,
-              // only animate the collapse on the way up; snap back instantly
               transition:
                 phase === "fly"
                   ? `max-width ${MORPH}, opacity ${MORPH}, margin-left ${MORPH}`
@@ -332,7 +366,6 @@ export function FmuxChat({ active }: FmuxChatProps) {
         </div>
       </div>
 
-      {/* Composer bar */}
       <div
         style={{
           position: "absolute",

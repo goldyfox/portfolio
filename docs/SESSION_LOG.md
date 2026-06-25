@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-23 — Session 31: Navigation + Doodles layout
 
+### 20:30 — First production deploy to DreamHost shared
+- Files: none (deploy only via `npm run deploy`).
+- What: Built static export and rsync'd 232 files to `/home/dh_au54yu/lisaaufox.com`. DNS now points both apex and www to DreamHost (`173.236.198.112`). Contact form not configured — `NEXT_PUBLIC_CONTACT_FORM_URL` still unset in `.env.deploy`.
+- Decisions: None.
+
 ### 19:55 — Deploy pivoted to static export (DreamHost shared/unlimited)
 - Files: `next.config.ts`, `scripts/deploy.sh`, `env.deploy.example`, `public/.htaccess`, `app/contact/page.tsx`, `app/opengraph-image.tsx`, `archive/api/contact-route.ts` (moved from `app/api/contact/`), `scripts/dreamhost-server-setup.sh` (deleted).
 - What: Lisa is on **Shared/unlimited** — no Node.js. Switched from standalone/PM2 to **`output: "export"`** + rsync `out/` to web root. Contact form now posts to **Formspree** via `NEXT_PUBLIC_CONTACT_FORM_URL` (baked at build from `.env.deploy`). Resend API route archived under `archive/api/`. Apache `.htaccess` for 404 + HTTPS redirect.

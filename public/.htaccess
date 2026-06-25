@@ -1,3 +1,6 @@
+# Disable directory indexes
+Options -Indexes
+
 # DreamHost Apache — static Next.js export (trailingSlash: true)
 ErrorDocument 404 /404.html
 

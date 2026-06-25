@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 18:40 — Formspree domain spam: forward Referer/Origin in PHP proxy
+- Files: `scripts/contact-submit.php.template` (edited).
+- What: Formspree "Restrict to Domain" checks HTTP `Referer`/`Origin` on the API request, not custom JSON fields like `refererHeader`. PHP curl was posting to Formspree without those headers → unauthorized domain spam. Proxy now forwards client Referer, Origin, User-Agent, Accept-Language; falls back to `https://lisaaufox.com`. Deployed.
+- Decisions: Formspree setting should stay `lisaaufox.com` (no `www` prefix) since www redirects to apex.
+
 ### 18:25 — Canonical redirects: www → lisaaufox.com + HTTPS
 - Files: `public/.htaccess`, `app/layout.tsx` (edited).
 - What: Added Apache rules — `www` → apex in one hop (includes HTTPS), then HTTP → HTTPS for apex. Moved redirect rules before internal `/index/` rewrites. Updated `metadataBase` to `https://lisaaufox.com`. Deployed.

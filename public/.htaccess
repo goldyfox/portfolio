@@ -9,7 +9,7 @@ RewriteEngine On
 # Allow Let's Encrypt HTTP-01 validation (do not redirect to HTTPS).
 RewriteRule ^\.well-known/acme-challenge/ - [L]
 
-# Canonical host: www → apex, always HTTPS (one hop for http://www…).
+# Canonical host: www → apex (always use lisaaufox.com, never www).
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
 RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
 

@@ -31,8 +31,6 @@ if [[ -z "$FORMSPREE_URL" ]]; then
 fi
 
 echo "→ Building static site (out/)…"
-# Browser posts to PHP proxy; Formspree URL stays server-side in generated contact-submit.php.
-export NEXT_PUBLIC_CONTACT_FORM_URL="/contact-submit.php"
 npm run build
 
 OUT_DIR="$ROOT_DIR/out"
@@ -60,4 +58,4 @@ rsync -avz --delete \
   "$OUT_DIR/" \
   "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
 
-echo "✓ Deploy complete — https://www.lisaaufox.com"
+echo "✓ Deploy complete — https://lisaaufox.com"

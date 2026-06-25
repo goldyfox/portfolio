@@ -2,10 +2,13 @@
 
 import { useState, useRef } from "react";
 
-// Production posts to /contact-submit.php (DreamHost PHP proxy adds IP from proxy headers).
-// Local dev: set NEXT_PUBLIC_CONTACT_FORM_URL to your Formspree URL in .env.local.
+// Production always posts same-origin (avoids apex/www redirect CORS issues).
+// Dev only: set NEXT_PUBLIC_CONTACT_FORM_URL to Formspree in .env.local.
 const CONTACT_ENDPOINT =
-  process.env.NEXT_PUBLIC_CONTACT_FORM_URL ?? "/contact-submit.php";
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_CONTACT_FORM_URL
+    ? process.env.NEXT_PUBLIC_CONTACT_FORM_URL
+    : "/contact-submit.php";
 
 export default function Contact() {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");

@@ -5,6 +5,7 @@ import { MainNav } from "@/components/main-nav";
 import { FooterNav } from "@/components/footer-nav";
 import { FlipTitle } from "@/components/flip-title";
 import { SITE_CONTENT_SHELL } from "@/lib/site-layout";
+import { SITE_ORIGIN } from "@/lib/site-url";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,7 +23,10 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://lisaaufox.com"),
+  metadataBase: new URL(SITE_ORIGIN),
+  alternates: {
+    canonical: "/",
+  },
   title: "Lisa Aufox — Product Design",
   description:
     "Portfolio of Lisa Aufox, a product designer working at the intersection of AI, monetization, and messaging at Meta.",

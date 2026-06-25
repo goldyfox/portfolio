@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 18:55 — Apex-only canonical: fix contact CORS / www redirect
+- Files: `lib/site-url.ts` (created), `app/layout.tsx`, `app/contact/page.tsx`, `scripts/contact-submit.php.template`, `scripts/deploy.sh`, `public/.htaccess`.
+- What: Production contact form now **always** POSTs to same-origin `/contact-submit.php` (never env-baked absolute URLs that could cross apex/www). `SITE_ORIGIN` constant + canonical metadata. PHP handles OPTIONS + CORS for apex only. Deploy message + htaccess comments updated.
+- Decisions: **Canonical host is apex only** (`https://lisaaufox.com`). www redirects to apex. DreamHost panel should not force apex→www.
+
 ### 18:40 — Formspree domain spam: forward Referer/Origin in PHP proxy
 - Files: `scripts/contact-submit.php.template` (edited).
 - What: Formspree "Restrict to Domain" checks HTTP `Referer`/`Origin` on the API request, not custom JSON fields like `refererHeader`. PHP curl was posting to Formspree without those headers → unauthorized domain spam. Proxy now forwards client Referer, Origin, User-Agent, Accept-Language; falls back to `https://lisaaufox.com`. Deployed.

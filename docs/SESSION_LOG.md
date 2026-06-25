@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 19:30 — Deploy: drop rsync --chmod (unsupported on macOS 2.x)
+- Files: `scripts/deploy.sh` (edited).
+- What: `--chmod=D755,F644` fails on macOS rsync. Removed; post-upload SSH `find … chmod` on server replaces it. Deploy verified.
+- Decisions: None.
+
 ### 19:20 — Deploy: fix permissions (don't block), block secrets only
 - Files: `scripts/normalize-deploy-permissions.sh`, `scripts/verify-deploy-bundle.sh`, `scripts/deploy.sh` (created/updated).
 - What: Before build, normalize `public/` (fix 600 files / 700 dirs → 644/755). After build, normalize `out/` the same way. Verify step **only blocks secrets** (`.env*`, keys, pem, etc.) — never blocks on permissions. rsync excludes secrets as belt-and-suspenders.

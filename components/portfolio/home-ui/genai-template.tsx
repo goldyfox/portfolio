@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTileNarrow } from "@/components/portfolio/use-tile-compact";
 
 /**
  * Homepage tile: the L1 Ads-Manager "Conversations" template card (GenAI demo).
@@ -58,6 +59,8 @@ const GENAI_Q = [
 type Phase = "default" | "glimmer" | "genai";
 
 export function GenaiTemplate({ active }: { active?: boolean }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const narrow = useTileNarrow(rootRef);
   const [phase, setPhase] = useState<Phase>("default");
   const [reduced, setReduced] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -238,6 +241,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
 
   return (
     <div
+      ref={rootRef}
       style={{
         position: "absolute",
         inset: 0,
@@ -245,7 +249,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "8%",
+        padding: narrow ? "5%" : "8%",
         boxSizing: "border-box",
         fontFamily: SF,
       }}

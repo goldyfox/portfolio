@@ -39,7 +39,7 @@ export function ProjectTile({
   return (
     <SiteLink
       href={href}
-      className={`project-card group flex flex-col gap-4 ${className ?? ""}`}
+      className={`project-card group flex flex-col gap-4 max-[767px]:pb-2 ${className ?? ""}`}
     >
       <div
         className={`relative w-full overflow-hidden rounded-[2px] ${imageAspect} ${

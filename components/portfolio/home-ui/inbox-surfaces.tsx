@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTileCompact } from "@/components/portfolio/use-tile-compact";
 
 /**
  * Homepage tile: the ad-creation entry point shipped across three different
@@ -158,6 +159,8 @@ const SURFACES: Surface[] = [
 ];
 
 export function InboxSurfaces({ active }: { active?: boolean }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const compact = useTileCompact(rootRef, 0.62);
   const [lit, setLit] = useState(false);
   const [reduced, setReduced] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -201,8 +204,15 @@ export function InboxSurfaces({ active }: { active?: boolean }) {
     return clear;
   }, [reduced, playing]);
 
+  const cardW = compact ? 26 : CARD_W;
+  const gap = compact ? 2.8 : GAP;
+  const logoGap = compact ? 2.6 : LOGO_GAP;
+  const topPad = compact ? 2.2 : TOP_PAD;
+  const logoBand = compact ? 5.2 : LOGO_BAND;
+
   return (
     <div
+      ref={rootRef}
       style={{
         position: "absolute",
         inset: 0,
@@ -212,22 +222,22 @@ export function InboxSurfaces({ active }: { active?: boolean }) {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: c(TOP_PAD),
+        paddingTop: c(topPad),
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: c(GAP) }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: c(gap) }}>
         {SURFACES.map((s) => {
-          const fullImgH = CARD_W / s.aspect; // full screen height at card width
+          const fullImgH = cardW / s.aspect; // full screen height at card width
           return (
             <div key={s.key} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
               {/* Logos sit in a fixed-height band, bottom-aligned, so all card tops match. */}
               <div
                 style={{
-                  height: c(LOGO_BAND),
+                  height: c(logoBand),
                   display: "flex",
                   alignItems: "flex-end",
                   justifyContent: "center",
-                  marginBottom: c(LOGO_GAP),
+                  marginBottom: c(logoGap),
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -238,7 +248,7 @@ export function InboxSurfaces({ active }: { active?: boolean }) {
               <div
                 style={{
                   position: "relative",
-                  width: c(CARD_W),
+                  width: c(cardW),
                   height: c(fullImgH),
                   borderRadius: `${c(1.6)} ${c(1.6)} 0 0`,
                   overflow: "hidden",

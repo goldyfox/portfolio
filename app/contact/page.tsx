@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { ContactField } from "@/components/portfolio/contact-field";
 
 // Production always posts same-origin (avoids apex/www redirect CORS issues).
 // Dev only: set NEXT_PUBLIC_CONTACT_FORM_URL to Formspree in .env.local.
@@ -154,59 +155,9 @@ export default function Contact() {
                 <input type="text" name="_hp" tabIndex={-1} autoComplete="off" />
               </div>
 
-              {/* Name */}
-              <div className="relative">
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  placeholder=" "
-                  className="peer w-full bg-transparent border-0 border-b border-gray-300 py-4 px-0 font-serif text-lg text-gray-900 placeholder-transparent focus:ring-0 focus:border-ethos-blue transition-colors rounded-none"
-                />
-                <label
-                  htmlFor="name"
-                  className="absolute left-0 top-4 font-sans uppercase tracking-[0.15em] text-[11px] text-gray-400 transition-all peer-focus:-translate-y-6 peer-focus:text-[11px] peer-focus:text-ethos-blue peer-[:not(:placeholder-shown)]:-translate-y-6 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:text-ethos-blue pointer-events-none"
-                >
-                  Name / Required
-                </label>
-              </div>
-
-              {/* Email */}
-              <div className="relative">
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  required
-                  placeholder=" "
-                  className="peer w-full bg-transparent border-0 border-b border-gray-300 py-4 px-0 font-serif text-lg text-gray-900 placeholder-transparent focus:ring-0 focus:border-ethos-blue transition-colors rounded-none"
-                />
-                <label
-                  htmlFor="email"
-                  className="absolute left-0 top-4 font-sans uppercase tracking-[0.15em] text-[11px] text-gray-400 transition-all peer-focus:-translate-y-6 peer-focus:text-[11px] peer-focus:text-ethos-blue peer-[:not(:placeholder-shown)]:-translate-y-6 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:text-ethos-blue pointer-events-none"
-                >
-                  Email / Required
-                </label>
-              </div>
-
-              {/* Message */}
-              <div className="relative pt-4">
-                <textarea
-                  id="message"
-                  name="message"
-                  required
-                  rows={4}
-                  placeholder=" "
-                  className="peer w-full bg-transparent border-0 border-b border-gray-300 py-4 px-0 font-serif text-lg text-gray-900 placeholder-transparent focus:ring-0 focus:border-ethos-blue transition-colors rounded-none resize-none"
-                />
-                <label
-                  htmlFor="message"
-                  className="absolute left-0 top-8 font-sans uppercase tracking-[0.15em] text-[11px] text-gray-400 transition-all peer-focus:-translate-y-8 peer-focus:text-[11px] peer-focus:text-ethos-blue peer-[:not(:placeholder-shown)]:-translate-y-8 peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:text-ethos-blue pointer-events-none"
-                >
-                  Message / Required
-                </label>
-              </div>
+              <ContactField id="name" label="Name / Required" />
+              <ContactField id="email" label="Email / Required" type="email" />
+              <ContactField id="message" label="Message / Required" multiline rows={4} />
 
               {status === "error" && (
                 <p className="font-sans text-[13px] text-red-600">{errorMsg}</p>

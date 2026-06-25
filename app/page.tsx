@@ -20,7 +20,7 @@ export default function Brief() {
       <PersonalIntro />
 
       {/* Asymmetric Project Grid */}
-      <section className="relative grid grid-cols-1 gap-y-24 pb-20 min-[768px]:grid-cols-12 min-[768px]:gap-x-6">
+      <section className="relative grid grid-cols-1 gap-y-32 pb-20 min-[768px]:grid-cols-12 min-[768px]:gap-x-6 min-[768px]:gap-y-24">
         <ProjectTile
           brief={fmux}
           href="/index/first-messaging-experience"

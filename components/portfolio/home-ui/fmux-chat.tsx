@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTileNarrow } from "@/components/portfolio/use-tile-compact";
 
 /**
  * Homepage tile: a Messenger thread, authentic to the Messenger design system.
@@ -76,6 +77,8 @@ interface FmuxChatProps {
 type Phase = "rest" | "fly" | "settle" | "fade" | "enterPrep" | "enter";
 
 export function FmuxChat({ active }: FmuxChatProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const narrow = useTileNarrow(rootRef);
   const [phase, setPhase] = useState<Phase>("rest");
   const [reduced, setReduced] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -185,8 +188,12 @@ export function FmuxChat({ active }: FmuxChatProps) {
     whiteSpace: "nowrap",
   };
 
+  const stackBottom = narrow ? 12.5 : STACK_BOTTOM;
+  const sentLabelTop = narrow ? 31.5 : SENT_LABEL_TOP;
+
   return (
     <div
+      ref={rootRef}
       style={{
         position: "absolute",
         inset: 0,
@@ -257,7 +264,7 @@ export function FmuxChat({ active }: FmuxChatProps) {
       <span
         style={{
           position: "absolute",
-          top: c(SENT_LABEL_TOP),
+          top: c(sentLabelTop),
           // align the "t" with where the bubble's straight edge ends (one
           // corner-radius in from the bubble's right edge), not its outer curve
           right: c(7.2),
@@ -275,7 +282,7 @@ export function FmuxChat({ active }: FmuxChatProps) {
       <div
         style={{
           position: "absolute",
-          bottom: c(STACK_BOTTOM),
+          bottom: c(stackBottom),
           left: c(4.5),
           right: c(4.5),
           display: "flex",

@@ -27,6 +27,21 @@ export function useTileCompact(
   return compact;
 }
 
+/** True when the viewport is at or below `maxWidth` (mobile single-column layout). */
+export function useMobileViewport(maxWidth = 767) {
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    setMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [maxWidth]);
+
+  return mobile;
+}
+
 /** True when the tile width is below `maxWidth` (mobile single-column layout). */
 export function useTileNarrow(
   ref: RefObject<HTMLElement | null>,

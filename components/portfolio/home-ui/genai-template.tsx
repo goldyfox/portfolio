@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTileNarrow } from "@/components/portfolio/use-tile-compact";
+import { useMobileViewport } from "@/components/portfolio/use-tile-compact";
 
 /**
  * Homepage tile: the L1 Ads-Manager "Conversations" template card (GenAI demo).
@@ -58,9 +58,30 @@ const GENAI_Q = [
 
 type Phase = "default" | "glimmer" | "genai";
 
+// Panel-local layout (428px design coords). Mobile single-column stack uses
+// taller greeting slot + adjusted offsets; desktop grid keeps Figma coords.
+const PANEL_LAYOUT = {
+  desktop: {
+    greetingBodyTop: 30,
+    greetingBodyHeight: 18,
+    questionsHeadingTop: 62,
+    questionsBodyTop: 84,
+    addResponsesTop: 146,
+    panelHeight: 172,
+  },
+  narrow: {
+    greetingBodyTop: 35,
+    greetingBodyHeight: 28,
+    questionsHeadingTop: 66,
+    questionsBodyTop: 88,
+    addResponsesTop: 150,
+    panelHeight: 176,
+  },
+} as const;
+
 export function GenaiTemplate({ active }: { active?: boolean }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const narrow = useTileNarrow(rootRef);
+  const mobilePanel = useMobileViewport();
+  const panel = mobilePanel ? PANEL_LAYOUT.narrow : PANEL_LAYOUT.desktop;
   const [phase, setPhase] = useState<Phase>("default");
   const [reduced, setReduced] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -241,7 +262,6 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
 
   return (
     <div
-      ref={rootRef}
       style={{
         position: "absolute",
         inset: 0,
@@ -249,7 +269,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: narrow ? "5%" : "8%",
+        padding: "8%",
         boxSizing: "border-box",
         fontFamily: SF,
       }}
@@ -354,7 +374,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
               top: p(152),
               left: p(16),
               width: p(396),
-              height: p(172),
+              height: p(panel.panelHeight),
               background: PANEL,
               borderRadius: p(4),
               boxSizing: "border-box",
@@ -375,17 +395,17 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
             <div
               style={{
                 position: "absolute",
-                top: p(30),
+                top: p(panel.greetingBodyTop),
                 left: p(8),
                 width: p(375),
-                height: p(18),
+                height: p(panel.greetingBodyHeight),
               }}
             >
               <div style={fadeLayer(phase === "default")}>
-                <span style={bodyText}>{DEFAULT_GREETING}</span>
+                <span style={{ ...bodyText, display: "block" }}>{DEFAULT_GREETING}</span>
               </div>
               <div style={fadeLayer(phase === "genai")}>
-                <span style={bodyText}>{GENAI_GREETING}</span>
+                <span style={{ ...bodyText, display: "block" }}>{GENAI_GREETING}</span>
               </div>
               {/* top inset so the bar clears the "g" descender of "Greeting" */}
               <div style={skeletonBar(phase === "glimmer", p(4))}>
@@ -396,7 +416,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
             <div
               style={{
                 position: "absolute",
-                top: p(62),
+                top: p(panel.questionsHeadingTop),
                 left: p(8),
                 fontSize: p(14),
                 fontWeight: 700,
@@ -404,13 +424,10 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
             >
               Questions and responses
             </div>
-            {/* questions slot — dropped to p(84) so the heading→body gap matches
-                the greeting block (the greeting body inherits a taller line box,
-                so identical numeric offsets render unequal) */}
             <div
               style={{
                 position: "absolute",
-                top: p(84),
+                top: p(panel.questionsBodyTop),
                 left: p(8),
                 width: p(375),
                 height: p(51),
@@ -430,7 +447,7 @@ export function GenaiTemplate({ active }: { active?: boolean }) {
             <div
               style={{
                 position: "absolute",
-                top: p(146),
+                top: p(panel.addResponsesTop),
                 left: p(8),
                 fontSize: p(13),
                 fontWeight: 500,

@@ -6,6 +6,21 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 20:05 — GenAI tile: mobile panel at 767px viewport, not tile width
+- Files: `components/portfolio/home-ui/genai-template.tsx`, `components/portfolio/use-tile-compact.ts` (edited).
+- What: Mobile greeting panel layout was applying on desktop because the grid column is often <420px wide. Switched to `useMobileViewport(767)` so desktop grid always uses Figma coords; mobile stack keeps tuned panel offsets + taller greeting slot.
+- Decisions: Viewport breakpoint matches homepage `min-[768px]` grid.
+
+### 19:50 — GenAI tile: narrow panel spacing (greeting matches questions)
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: On narrow tiles (<420px), greeting body slot drops p(30→35) so heading→body gap matches questions (22 design units). Taller greeting slot for 2-line wrap; questions block + panel height shift down in lockstep. Desktop layout unchanged.
+- Decisions: Panel offsets only — no padding or font-size changes.
+
+### 19:40 — Revert unauthorized GenAI tile padding change
+- Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
+- What: Restored fixed `padding: 8%` on GenAI tile. Mobile spacing pass had dropped it to 5% on narrow tiles without approval; that shifted card scale and cramped the greeting panel. No font-size values were changed in code — only outer inset.
+- Decisions: Do not tune GenAI tile in mobile passes unless asked.
+
 ### 19:25 — FMUX tile: measured fly distance (fixes sent/welcome overlap)
 - Files: `components/portfolio/home-ui/fmux-chat.tsx` (edited).
 - What: Fixed cqw constants couldn't account for welcome text wrap at every tile width. Fly distance + "Sent" label now measured from the welcome bubble's rendered bottom via ResizeObserver; re-measured before each send cycle and on font load.

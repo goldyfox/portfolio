@@ -35,7 +35,6 @@ The site is deployed via rsync, using SFTP to Dreamhost. It uses the SSH identit
 
 Deploy variables are stored in `.env.deploy`. This file is NOT checked into github for security reasons.
 
-
 To deploy the site, commit all changes via:
 
 ```

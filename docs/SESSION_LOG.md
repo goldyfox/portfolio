@@ -4,6 +4,13 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ---
 
+## 2026-06-25 — Session 33: Resume swap
+
+### 19:30 — Replace site resume with AufoxResume2026.pdf
+- Files: `public/resume.pdf` (replaced).
+- What: Copied `~/Downloads/AufoxResume2026.pdf` → `public/resume.pdf` (372KB). Footer link unchanged at `/resume.pdf`.
+- Decisions: None.
+
 ## 2026-06-24 — Session 32: Contact form IP logging
 
 ### 21:00 — Homepage revenue stat $8.2B → $18B

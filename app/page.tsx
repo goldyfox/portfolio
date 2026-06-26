@@ -42,6 +42,7 @@ export default function Brief() {
           href="/index/inbox-ads"
           imageAspect="aspect-[16/9]"
           media={<InboxSurfaces />}
+          elevate
           className="relative z-10 min-[768px]:col-start-3 min-[768px]:col-end-10 min-[768px]:-mt-[76px]"
         />
       </section>

@@ -16,6 +16,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 - What: Added 180×180 PNG apple-touch-icon generated at build from `app/icon.svg` (cream + blue triangle). Next.js emits `<link rel="apple-touch-icon">` automatically.
 - Decisions: Same mark as favicon; no separate home-screen design.
 
+### 21:25 — Inbox homepage tile: add missing `elevate` glow
+- Files: `app/page.tsx` (edited).
+- What: Inbox-ads tile was missing the `elevate` prop on `ProjectTile` — FMUX and GenAI already had it. Adds z-lift above grid overlay + `box-shadow: 0 20px 50px rgba(19,19,236,0.1)`.
+- Decisions: None — matches original intent when `elevate` was made reusable for all live tiles.
+
 ### 20:15 — GenAI tile: desktop greeting body p(34)
 - Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
 - What: Desktop greeting heading→body gap tuned from p(30) to p(34). Mobile panel layout unchanged.

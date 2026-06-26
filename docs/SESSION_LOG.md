@@ -16,12 +16,30 @@ Running daily log of decisions, references, and context. Future agents: **read t
 - What: Swapped in Lisa's revised `~/Downloads/AufoxResume2026-new.pdf` (372KB). Same footer path `/resume.pdf`.
 - Decisions: None.
 
+### 21:45 — Revenue figures: different scopes (not a mismatch)
+- Files: none (context only).
+- What: Lisa clarified headline numbers measure different things. **$18B** = total messaging ads revenue (homepage Status + GenAI hero). **$8.9B** (resume) = incremental 2025 revenue growth from **multiple AI projects**, not all work combined.
+- Decisions: Do not flag $18B vs $8.9B as inconsistent.
+
+### 21:50 — GenAI case study hero: $8.2B → $18B
+- Files: `app/index/genai-conversations/page.tsx` (edited).
+- What: Updated hero intro to match homepage — total messaging ads revenue at $18B.
+- Decisions: None.
+
+### 22:10 — Portfolio readiness review + log corrections
+- Files: `docs/SESSION_LOG.md` (edited).
+- What: Lisa asked if the site is ready to apply for jobs. Reviewed live state; corrected two stale agent claims that came from old log entries instead of the codebase:
+  - **FMUX** (`/index/first-messaging-experience`) — fully asset-backed (before PNGs, variant PNGs, three `.mp4`/`.mov` flows). `MobileScreenPlaceholder` is a legacy component name; every instance on the page passes a real `src`. No Explorations scroller on the current page.
+  - **Lab** (`/lab`) — two shipped experiments: **Chroma Capture** + **Typoglycemia**. No empty placeholder slot (AVA moved to `/index/virtual-agent`; old "slot 02 placeholder" log is stale).
+  - **Contact form** — Lisa verified test message delivers (Formspree + PHP proxy).
+- Decisions: **Future agents: verify live pages/code before claiming gaps.** Session log is history; `app/` and `public/` are source of truth for shipped state.
+
 ## 2026-06-24 — Session 32: Contact form IP logging
 
 ### 21:00 — Homepage revenue stat $8.2B → $18B
 - Files: `components/portfolio/personal-intro.tsx` (edited).
 - What: Updated Status block revenue figure on homepage intro from $8.2B to $18B. `$` in Inter Bold (`font-sans font-bold`) for full vertical bar; `18B` in Newsreader Bold.
-- Decisions: Homepage only; case study pages still reference $8.2B.
+- Decisions: Homepage first; GenAI hero updated to $18B in Session 33 (21:50).
 
 ### 21:15 — Apple Touch Icon for iOS home screen
 - Files: `app/apple-icon.tsx` (created).

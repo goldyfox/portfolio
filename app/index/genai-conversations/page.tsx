@@ -53,7 +53,7 @@ export default function GenAiConversations() {
             <div className="min-[768px]:col-span-4">
               <p className="font-serif text-xl max-w-[26rem] leading-relaxed text-gray-600">
                 Meta&apos;s messaging ads span Messenger, Instagram, and
-                WhatsApp — driving $8.2B in revenue. The ad creation model
+                WhatsApp — driving $18B in messaging ads revenue. The ad creation model
                 hadn&apos;t kept pace; advertisers were still struggling to build messaging
                 experiences manually. I redesigned the creation flow so
                 advertisers are responsible for content approval, not content

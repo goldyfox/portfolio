@@ -12,7 +12,9 @@ export function PersonalIntro() {
             Status
           </p>
           <p className="font-serif text-[18px] leading-[1.6] text-gray-800">
-            Currently generating $8.2B in messaging ads revenue. Focused on
+            Currently generating{" "}
+            <span className="font-sans font-bold">$</span>
+            <span className="font-bold">18B</span> in messaging ads revenue. Focused on
             agentic AI, generative creation flows, and asynchronous communication.
             Previously Autodesk.
           </p>

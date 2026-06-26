@@ -6,6 +6,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 
 ## 2026-06-24 — Session 32: Contact form IP logging
 
+### 21:00 — Homepage revenue stat $8.2B → $18B
+- Files: `components/portfolio/personal-intro.tsx` (edited).
+- What: Updated Status block revenue figure on homepage intro from $8.2B to $18B. `$` in Inter Bold (`font-sans font-bold`) for full vertical bar; `18B` in Newsreader Bold.
+- Decisions: Homepage only; case study pages still reference $8.2B.
+
 ### 20:15 — GenAI tile: desktop greeting body p(34)
 - Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
 - What: Desktop greeting heading→body gap tuned from p(30) to p(34). Mobile panel layout unchanged.

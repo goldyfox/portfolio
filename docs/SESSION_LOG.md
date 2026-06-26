@@ -11,6 +11,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 - What: Updated Status block revenue figure on homepage intro from $8.2B to $18B. `$` in Inter Bold (`font-sans font-bold`) for full vertical bar; `18B` in Newsreader Bold.
 - Decisions: Homepage only; case study pages still reference $8.2B.
 
+### 21:15 — Apple Touch Icon for iOS home screen
+- Files: `app/apple-icon.tsx` (created).
+- What: Added 180×180 PNG apple-touch-icon generated at build from `app/icon.svg` (cream + blue triangle). Next.js emits `<link rel="apple-touch-icon">` automatically.
+- Decisions: Same mark as favicon; no separate home-screen design.
+
 ### 20:15 — GenAI tile: desktop greeting body p(34)
 - Files: `components/portfolio/home-ui/genai-template.tsx` (edited).
 - What: Desktop greeting heading→body gap tuned from p(30) to p(34). Mobile panel layout unchanged.

@@ -11,6 +11,11 @@ Running daily log of decisions, references, and context. Future agents: **read t
 - What: Copied `~/Downloads/AufoxResume2026.pdf` → `public/resume.pdf` (372KB). Footer link unchanged at `/resume.pdf`.
 - Decisions: None.
 
+### 21:20 — Resume refresh (AufoxResume2026-new.pdf)
+- Files: `public/resume.pdf` (replaced).
+- What: Swapped in Lisa's revised `~/Downloads/AufoxResume2026-new.pdf` (372KB). Same footer path `/resume.pdf`.
+- Decisions: None.
+
 ## 2026-06-24 — Session 32: Contact form IP logging
 
 ### 21:00 — Homepage revenue stat $8.2B → $18B

@@ -5,6 +5,7 @@ import { FmuxChat } from "@/components/portfolio/home-ui/fmux-chat";
 import { GenaiTemplate } from "@/components/portfolio/home-ui/genai-template";
 import { InboxSurfaces } from "@/components/portfolio/home-ui/inbox-surfaces";
 import { GridHydration } from "@/components/grid-hydration";
+import { BackToIndex } from "@/components/portfolio/back-to-index";
 import { briefs } from "@/lib/content/briefs";
 
 export const metadata: Metadata = {
@@ -46,6 +47,10 @@ export default function Brief() {
           className="relative z-10 min-[768px]:col-start-3 min-[768px]:col-end-10 min-[768px]:-mt-[76px]"
         />
       </section>
+
+      <div className="pb-macro">
+        <BackToIndex label="See all projects" />
+      </div>
     </div>
   );
 }

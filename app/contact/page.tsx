@@ -126,7 +126,26 @@ export default function Contact() {
           <div className="h-px w-16 bg-ethos-blue mx-auto mt-6 mb-6" />
           <p className="font-serif text-lg text-gray-600 max-w-md mx-auto leading-relaxed">
             I&rsquo;m always interested in conversations about design, AI, and
-            building products that matter.
+            building products that matter. Also available for mentoring and
+            portfolio reviews.
+          </p>
+        </div>
+
+        {/* Coffee chat CTA */}
+        <div className="mb-16 text-center">
+          <p className="font-serif text-lg text-gray-800 leading-relaxed">
+            <a
+              href="https://calendly.com/lisaaufox/30min"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ethos-blue hover:text-ethos-blue/80 underline underline-offset-4"
+            >
+              Let&rsquo;s grab coffee
+            </a>{" "}
+            ☕
+          </p>
+          <p className="font-serif text-base text-gray-500 mt-3">
+            In SF and want to meet in person? Say so when you book.
           </p>
         </div>
 
